@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #1e293b;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+.loading-line-track {
+  position: relative;
+  height: 8px;
+  border-radius: 9999px;
+  overflow: hidden;
+  background: linear-gradient(90deg, #d9e5f3 0%, #cddced 100%);
+  box-shadow: inset 0 1px 2px rgba(14, 35, 58, 0.12);
+}
+
+.loading-line-runner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 34%;
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #6ab04c 0%, #7fd15c 55%, #9ae07c 100%);
+  box-shadow: 0 0 12px rgba(70, 160, 255, 0.55);
+  animation: loading-line-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes loading-line-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

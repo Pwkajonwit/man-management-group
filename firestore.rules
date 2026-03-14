@@ -1,0 +1,140 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userProfilePath() {
+      return /databases/$(database)/documents/systemUsers/$(request.auth.uid);
+    }
+
+    function hasUserProfile() {
+      return signedIn() && exists(userProfilePath());
+    }
+
+    function userProfile() {
+      return get(userProfilePath());
+    }
+
+    function userRole() {
+      return hasUserProfile() && userProfile().data.role is string
+        ? userProfile().data.role
+        : 'staff';
+    }
+
+    function userOrgId() {
+      return hasUserProfile() && userProfile().data.orgId is string
+        ? userProfile().data.orgId
+        : 'org-default';
+    }
+
+    function hasBranchAccess(branchId) {
+      return userRole() == 'super_admin'
+        || (hasUserProfile() && userProfile().data.branchId is string && userProfile().data.branchId == branchId)
+        || (hasUserProfile() && userProfile().data.branchIds is list && branchId in userProfile().data.branchIds);
+    }
+
+    function hasDepartmentAccess(departmentId) {
+      return userRole() == 'super_admin'
+        || (hasUserProfile() && userProfile().data.departmentId is string && userProfile().data.departmentId == departmentId)
+        || (hasUserProfile() && userProfile().data.departmentIds is list && departmentId in userProfile().data.departmentIds);
+    }
+
+    function isAdminRole() {
+      return userRole() in ['super_admin', 'branch_manager', 'department_manager'];
+    }
+
+    function isSuperAdmin() {
+      return userRole() == 'super_admin';
+    }
+
+    function canAccessScopedData(data) {
+      let orgId = data.orgId is string ? data.orgId : 'org-default';
+      let branchId = data.branchId is string ? data.branchId : 'branch-hq';
+      let departmentId = data.departmentId is string ? data.departmentId : 'dept-general';
+
+      return signedIn()
+        && (
+          userRole() == 'super_admin'
+          || (
+            orgId == userOrgId()
+            && hasBranchAccess(branchId)
+            && (
+              userRole() == 'branch_manager'
+              || hasDepartmentAccess(departmentId)
+            )
+          )
+        );
+    }
+
+    function taskDoc(taskId) {
+      return get(/databases/$(database)/documents/tasks/$(taskId));
+    }
+
+    function canAccessTask(taskId) {
+      return taskDoc(taskId).exists() && canAccessScopedData(taskDoc(taskId).data);
+    }
+
+    match /projects/{projectId} {
+      allow read: if canAccessScopedData(resource.data);
+      allow create: if isAdminRole() && canAccessScopedData(request.resource.data);
+      allow update: if isAdminRole()
+        && canAccessScopedData(resource.data)
+        && canAccessScopedData(request.resource.data);
+      allow delete: if isAdminRole() && canAccessScopedData(resource.data);
+    }
+
+    match /tasks/{taskId} {
+      allow read: if canAccessScopedData(resource.data);
+      allow create: if canAccessScopedData(request.resource.data);
+      allow update: if canAccessScopedData(resource.data) && canAccessScopedData(request.resource.data);
+      allow delete: if canAccessScopedData(resource.data);
+    }
+
+    match /teamMembers/{memberId} {
+      allow read: if canAccessScopedData(resource.data);
+      allow create: if isAdminRole() && canAccessScopedData(request.resource.data);
+      allow update: if isAdminRole()
+        && canAccessScopedData(resource.data)
+        && canAccessScopedData(request.resource.data);
+      allow delete: if isAdminRole() && canAccessScopedData(resource.data);
+    }
+
+    match /systemUsers/{userId} {
+      allow read: if signedIn()
+        && (
+          request.auth.uid == userId
+          || (isAdminRole() && canAccessScopedData(resource.data))
+        );
+      allow create, update: if isSuperAdmin() && canAccessScopedData(request.resource.data);
+      allow delete: if isSuperAdmin() && canAccessScopedData(resource.data);
+    }
+
+    match /appConfig/{docId} {
+      allow read: if signedIn();
+      allow write: if isAdminRole();
+    }
+
+    match /subtasks/{subTaskId} {
+      allow read, delete: if signedIn() && canAccessTask(resource.data.taskId);
+      allow create, update: if signedIn() && canAccessTask(request.resource.data.taskId);
+    }
+
+    match /attachments/{attachmentId} {
+      allow read, delete: if signedIn() && canAccessTask(resource.data.taskId);
+      allow create, update: if signedIn() && canAccessTask(request.resource.data.taskId);
+    }
+
+    match /activityLog/{activityId} {
+      allow read, delete: if signedIn() && canAccessTask(resource.data.taskId);
+      allow create, update: if signedIn() && canAccessTask(request.resource.data.taskId);
+    }
+
+    match /taskUpdates/{updateId} {
+      allow read, delete: if signedIn() && canAccessTask(resource.data.taskId);
+      allow create, update: if signedIn() && canAccessTask(request.resource.data.taskId);
+    }
+  }
+}
