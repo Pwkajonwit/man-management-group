@@ -13,6 +13,8 @@ export default function MePage() {
         currentUserName,
         loading,
         handleUpdateTaskStatus,
+        taskScopeBranchOptions,
+        taskScopeDepartmentOptions,
     } = useAppContext();
 
     if (loading) return <LinearLoadingScreen message="กำลังโหลดงานของคุณ..." />;
@@ -23,6 +25,8 @@ export default function MePage() {
             projects={projects}
             teamMembers={teamMembers}
             currentUserName={currentUserName}
+            branchOptions={taskScopeBranchOptions}
+            departmentOptions={taskScopeDepartmentOptions}
             onStatusChange={handleUpdateTaskStatus}
         />
     );

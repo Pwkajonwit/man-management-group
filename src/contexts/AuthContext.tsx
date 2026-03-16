@@ -11,8 +11,8 @@ import {
     updateProfile,
     User as FirebaseUser,
 } from 'firebase/auth';
-import { getSystemUserAccountById, getTeamMembers, updateTeamMember, upsertSystemUserAccount } from '@/lib/firestore';
-import { SystemUserRole, TeamMember } from '@/types/construction';
+import { getSystemUserAccountById, getSystemUserAccounts, getTeamMembers, updateTeamMember, upsertSystemUserAccount } from '@/lib/firestore';
+import { SystemUserAccount, SystemUserRole, TeamMember } from '@/types/construction';
 import {
     DEFAULT_BRANCH_ID,
     DEFAULT_DEPARTMENT_ID,
@@ -101,6 +101,26 @@ function mapTeamMemberToAuthUser(member: TeamMember, lineUserId?: string, pictur
     };
 }
 
+function mapSystemUserToAuthUser(account: SystemUserAccount, lineUserId?: string, pictureUrl?: string): AuthUser {
+    const branchId = account.branchId || DEFAULT_BRANCH_ID;
+    const departmentId = account.departmentId || DEFAULT_DEPARTMENT_ID;
+    const branchIds = Array.from(new Set([...(account.branchIds || []), branchId].filter(Boolean)));
+    const departmentIds = Array.from(new Set([...(account.departmentIds || []), departmentId].filter(Boolean)));
+
+    return {
+        uid: account.id,
+        displayName: account.displayName || account.username || account.email || 'User',
+        pictureUrl,
+        lineUserId: lineUserId || account.lineUserId,
+        orgId: account.orgId || DEFAULT_ORG_ID,
+        branchId,
+        departmentId,
+        role: account.role || DEFAULT_SYSTEM_USER_ROLE,
+        branchIds: branchIds.length > 0 ? branchIds : [DEFAULT_BRANCH_ID],
+        departmentIds: departmentIds.length > 0 ? departmentIds : [DEFAULT_DEPARTMENT_ID],
+    };
+}
+
 function mergeSystemScope(baseUser: AuthUser, account: {
     orgId?: string;
     branchId?: string;
@@ -144,6 +164,12 @@ function findMemberByPhone(members: TeamMember[], phone: string): TeamMember | n
     return members.find((member) => normalizePhone(member.phone || '') === normalized) || null;
 }
 
+function findSystemUserByPhone(users: SystemUserAccount[], phone: string): SystemUserAccount | null {
+    const normalized = normalizePhone(phone);
+    if (!normalized) return null;
+    return users.find((account) => normalizePhone(account.phone || '') === normalized) || null;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<AuthUser | null>(null);
     const [loading, setLoading] = useState(true);
@@ -160,8 +186,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     const profile = await getLineProfile();
                     if (profile && mounted) {
                         const normalizedPictureUrl = normalizeLinePictureUrl(profile.pictureUrl);
-                        const members = await getTeamMembers();
+                        const [members, systemAccounts] = await Promise.all([
+                            getTeamMembers(),
+                            getSystemUserAccounts(),
+                        ]);
+                        const matchedSystemByLine = systemAccounts.find((account) => account.lineUserId === profile.userId);
                         const matchedByLine = members.find((member) => member.lineUserId === profile.userId);
+
+                        if (matchedSystemByLine) {
+                            if (matchedByLine && normalizedPictureUrl && matchedByLine.avatar !== normalizedPictureUrl) {
+                                await updateTeamMember(matchedByLine.id, { avatar: normalizedPictureUrl });
+                            }
+
+                            void upsertSystemUserAccount(matchedSystemByLine.id, {
+                                lastLoginAt: new Date().toISOString(),
+                            }).catch((syncError) => {
+                                console.error('Failed to sync system user account on LINE login:', syncError);
+                            });
+
+                            setPendingLineProfile(null);
+                            setRequiresLinePhoneBinding(false);
+                            setUser(mergeSystemScope(
+                                mapSystemUserToAuthUser(matchedSystemByLine, profile.userId, normalizedPictureUrl),
+                                matchedSystemByLine
+                            ));
+                            setLoading(false);
+                            return;
+                        }
 
                         if (matchedByLine) {
                             if (normalizedPictureUrl && matchedByLine.avatar !== normalizedPictureUrl) {
@@ -243,27 +294,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             throw new Error('Please enter a valid phone number.');
         }
 
-        const members = await getTeamMembers();
+        const [members, systemAccounts] = await Promise.all([
+            getTeamMembers(),
+            getSystemUserAccounts(),
+        ]);
         const matchedMember = findMemberByPhone(members, normalizedInput);
+        const matchedSystemUser = findSystemUserByPhone(systemAccounts, normalizedInput);
 
-        if (!matchedMember) {
-            throw new Error('Phone number was not found in system users.');
+        if (!matchedMember && !matchedSystemUser) {
+            throw new Error('Phone number was not found in employees or system users.');
         }
 
-        if (matchedMember.lineUserId && matchedMember.lineUserId !== pendingLineProfile.userId) {
+        if (matchedMember?.lineUserId && matchedMember.lineUserId !== pendingLineProfile.userId) {
+            throw new Error('This phone is already linked with another LINE account.');
+        }
+
+        if (matchedSystemUser?.lineUserId && matchedSystemUser.lineUserId !== pendingLineProfile.userId) {
             throw new Error('This phone is already linked with another LINE account.');
         }
 
         const normalizedPictureUrl = normalizeLinePictureUrl(pendingLineProfile.pictureUrl);
-        const memberPatch: Partial<TeamMember> = { lineUserId: pendingLineProfile.userId };
-        if (normalizedPictureUrl && matchedMember.avatar !== normalizedPictureUrl) {
-            memberPatch.avatar = normalizedPictureUrl;
+        if (matchedMember) {
+            const memberPatch: Partial<TeamMember> = { lineUserId: pendingLineProfile.userId };
+            if (normalizedPictureUrl && matchedMember.avatar !== normalizedPictureUrl) {
+                memberPatch.avatar = normalizedPictureUrl;
+            }
+            await updateTeamMember(matchedMember.id, memberPatch);
         }
 
-        await updateTeamMember(matchedMember.id, memberPatch);
+        if (matchedSystemUser) {
+            await upsertSystemUserAccount(matchedSystemUser.id, {
+                lineUserId: pendingLineProfile.userId,
+                phone: matchedSystemUser.phone || phone.trim(),
+                lastLoginAt: new Date().toISOString(),
+            });
+        }
 
         setRequiresLinePhoneBinding(false);
         setPendingLineProfile(null);
+        if (matchedSystemUser) {
+            const updatedSystemUser: SystemUserAccount = {
+                ...matchedSystemUser,
+                lineUserId: pendingLineProfile.userId,
+                lastLoginAt: new Date().toISOString(),
+            };
+            setUser(mergeSystemScope(
+                mapSystemUserToAuthUser(updatedSystemUser, pendingLineProfile.userId, normalizedPictureUrl),
+                updatedSystemUser
+            ));
+            return;
+        }
+
+        if (!matchedMember) {
+            throw new Error('Phone number was not found in employees or system users.');
+        }
+
         setUser(mapTeamMemberToAuthUser(matchedMember, pendingLineProfile.userId, normalizedPictureUrl));
     };
 

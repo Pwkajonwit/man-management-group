@@ -18,6 +18,12 @@ import { getStatusColor, getStatusLabel } from '@/utils/statusUtils';
 import { useAppContext } from '@/contexts/AppContext';
 import { createTask as fbCreateTask } from '@/lib/firestore';
 import { useConfirmModal } from '@/contexts/ConfirmModalContext';
+import {
+  DEFAULT_BRANCH_ID,
+  DEFAULT_DEPARTMENT_ID,
+  isLegacyDefaultBranchId,
+  isLegacyDefaultDepartmentId,
+} from '@/lib/scope';
 
 // Priority helpers
 const PRIORITIES = ['urgent', 'high', 'medium', 'low'] as const;
@@ -85,14 +91,13 @@ export default function TaskBoardPage() {
     handleUpdateTaskName, handleUpdateTaskOwners,
     handleUpdateTaskStatus, handleUpdateTaskTimeline,
     handleUpdateTaskProgress, handleUpdateTaskPriority,
+    taskScopeBranchOptions, taskScopeDepartmentOptions,
   } = useAppContext();
   const modal = useConfirmModal();
 
   const [activeTab, setActiveTab] = useState<'table' | 'kanban' | 'calendar'>('table');
   const [activeOwnerDropdown, setActiveOwnerDropdown] = useState<string | null>(null);
   const [ownerDropdownAnchor, setOwnerDropdownAnchor] = useState<{ x: number; y: number } | null>(null);
-  const [activeCrewDropdown, setActiveCrewDropdown] = useState<string | null>(null);
-  const [crewDropdownAnchor, setCrewDropdownAnchor] = useState<{ x: number; y: number } | null>(null);
   const [activeStatusDropdown, setActiveStatusDropdown] = useState<string | null>(null);
   const [statusDropdownAnchor, setStatusDropdownAnchor] = useState<{ x: number; y: number } | null>(null);
   const [activePriorityDropdown, setActivePriorityDropdown] = useState<string | null>(null);
@@ -113,6 +118,8 @@ export default function TaskBoardPage() {
   const [showProjectSettings, setShowProjectSettings] = useState(false);
   const [projectNameDraft, setProjectNameDraft] = useState('');
   const [projectStatusDraft, setProjectStatusDraft] = useState<Project['status']>('planning');
+  const [projectBranchDraft, setProjectBranchDraft] = useState(DEFAULT_BRANCH_ID);
+  const [projectDepartmentDraft, setProjectDepartmentDraft] = useState(DEFAULT_DEPARTMENT_ID);
   const [savingProjectSettings, setSavingProjectSettings] = useState(false);
   const [deletingProject, setDeletingProject] = useState(false);
 
@@ -133,25 +140,55 @@ export default function TaskBoardPage() {
   );
   const activeProjectName = activeProject?.name || '';
   const activeProjectStatus = activeProject?.status || 'planning';
+  const activeProjectBranchId = (() => {
+    const sourceBranchId = activeProject?.branchId || DEFAULT_BRANCH_ID;
+    if (!isLegacyDefaultBranchId(sourceBranchId)) return sourceBranchId;
+    return taskScopeBranchOptions[0]?.id || sourceBranchId;
+  })();
+  const activeProjectDepartmentId = (() => {
+    const sourceDepartmentId = activeProject?.departmentId || DEFAULT_DEPARTMENT_ID;
+    if (!isLegacyDefaultDepartmentId(sourceDepartmentId)) return sourceDepartmentId;
+    return taskScopeDepartmentOptions.find((option) => !option.branchId || option.branchId === activeProjectBranchId)?.id
+      || taskScopeDepartmentOptions[0]?.id
+      || sourceDepartmentId;
+  })();
+  const projectDepartmentOptions = useMemo(() => {
+    const filtered = taskScopeDepartmentOptions.filter(
+      (option) => !option.branchId || option.branchId === projectBranchDraft
+    );
+
+    if (filtered.some((option) => option.id === projectDepartmentDraft)) {
+      return filtered;
+    }
+
+    const currentOption = taskScopeDepartmentOptions.find((option) => option.id === projectDepartmentDraft);
+    return currentOption ? [...filtered, currentOption] : filtered;
+  }, [projectBranchDraft, projectDepartmentDraft, taskScopeDepartmentOptions]);
 
   useEffect(() => {
     if (!activeProjectId) {
       setProjectNameDraft('');
       setProjectStatusDraft('planning');
+      setProjectBranchDraft(DEFAULT_BRANCH_ID);
+      setProjectDepartmentDraft(DEFAULT_DEPARTMENT_ID);
       setShowProjectSettings(false);
       return;
     }
     setProjectNameDraft(activeProjectName);
     setProjectStatusDraft(activeProjectStatus);
-  }, [activeProjectId, activeProjectName, activeProjectStatus]);
+    setProjectBranchDraft(activeProjectBranchId);
+    setProjectDepartmentDraft(activeProjectDepartmentId);
+  }, [activeProjectDepartmentId, activeProjectBranchId, activeProjectId, activeProjectName, activeProjectStatus]);
 
   const projectSettingsChanged = useMemo(() => {
     if (!activeProject) return false;
     return (
       projectNameDraft.trim() !== activeProject.name ||
-      projectStatusDraft !== activeProject.status
+      projectStatusDraft !== activeProject.status ||
+      projectBranchDraft !== (activeProject.branchId || DEFAULT_BRANCH_ID) ||
+      projectDepartmentDraft !== (activeProject.departmentId || DEFAULT_DEPARTMENT_ID)
     );
-  }, [activeProject, projectNameDraft, projectStatusDraft]);
+  }, [activeProject, projectBranchDraft, projectDepartmentDraft, projectNameDraft, projectStatusDraft]);
 
   const handleSaveProjectSettings = useCallback(async () => {
     if (!activeProject) return;
@@ -166,7 +203,11 @@ export default function TaskBoardPage() {
         activeProject.id,
         trimmedName,
         activeProject.code,
-        projectStatusDraft
+        projectStatusDraft,
+        {
+          branchId: projectBranchDraft,
+          departmentId: projectDepartmentDraft,
+        }
       );
       setShowProjectSettings(false);
     } catch (error) {
@@ -175,7 +216,7 @@ export default function TaskBoardPage() {
     } finally {
       setSavingProjectSettings(false);
     }
-  }, [activeProject, projectNameDraft, projectStatusDraft, updateWorkspace, modal]);
+  }, [activeProject, modal, projectBranchDraft, projectDepartmentDraft, projectNameDraft, projectStatusDraft, updateWorkspace]);
 
   const handleDeleteProject = useCallback(async () => {
     if (!activeProject || deletingProject) return;
@@ -203,13 +244,6 @@ export default function TaskBoardPage() {
     }
   }, [activeProject, deleteWorkspace, deletingProject, projects.length, modal]);
 
-  const memberTypeByName = useMemo(() => {
-    const map = new Map<string, 'team' | 'crew'>();
-    teamMembers.forEach((member) => {
-      map.set(member.name, member.memberType === 'crew' ? 'crew' : 'team');
-    });
-    return map;
-  }, [teamMembers]);
   const memberNameById = useMemo(() => {
     const map = new Map<string, string>();
     teamMembers.forEach((member) => {
@@ -285,17 +319,16 @@ export default function TaskBoardPage() {
   }, [projectTasks, searchQuery, filterStatus, filterPriority, filterOwner, sortBy, getTaskOwnerNames]);
 
   const assignmentByTaskId = useMemo(() => {
-    const map = new Map<string, { assignedNames: string[]; ownerNames: string[]; crewNames: string[] }>();
+    const map = new Map<string, { assignedNames: string[]; ownerNames: string[] }>();
     projectTasks.forEach((task) => {
       const assignedNames = getTaskOwnerNames(task);
       map.set(task.id, {
         assignedNames,
-        ownerNames: assignedNames.filter((name) => memberTypeByName.get(name) !== 'crew'),
-        crewNames: assignedNames.filter((name) => memberTypeByName.get(name) === 'crew'),
+        ownerNames: assignedNames,
       });
     });
     return map;
-  }, [projectTasks, getTaskOwnerNames, memberTypeByName]);
+  }, [projectTasks, getTaskOwnerNames]);
 
   // Counts for header badges
   const { overdueCount, dueSoonCount, unassignedCount } = useMemo(() => {
@@ -351,12 +384,10 @@ export default function TaskBoardPage() {
       items.slice(0, visibleLimit).map((task) => {
         const assignment = assignmentByTaskId.get(task.id);
         const ownerNames = assignment?.ownerNames || [];
-        const crewNames = assignment?.crewNames || [];
 
         return {
           name: task.name,
           ownerLabel: ownerNames.length > 0 ? ownerNames.join(', ') : 'ยังไม่ระบุ',
-          crewLabel: crewNames.length > 0 ? crewNames.join(', ') : '-',
           timeLabel: toLocalTimeLabel(task.updatedAt),
         };
       });
@@ -480,8 +511,6 @@ export default function TaskBoardPage() {
       setOwnerDropdownAnchor(null);
       return;
     }
-    setActiveCrewDropdown(null);
-    setCrewDropdownAnchor(null);
     setActiveStatusDropdown(null);
     setStatusDropdownAnchor(null);
     setActivePriorityDropdown(null);
@@ -494,26 +523,6 @@ export default function TaskBoardPage() {
     setActiveOwnerDropdown(taskId);
   };
 
-  const toggleCrewDropdown = (taskId: string, anchorEl: HTMLDivElement) => {
-    if (activeCrewDropdown === taskId) {
-      setActiveCrewDropdown(null);
-      setCrewDropdownAnchor(null);
-      return;
-    }
-    setActiveOwnerDropdown(null);
-    setOwnerDropdownAnchor(null);
-    setActiveStatusDropdown(null);
-    setStatusDropdownAnchor(null);
-    setActivePriorityDropdown(null);
-    setPriorityDropdownAnchor(null);
-    const rect = anchorEl.getBoundingClientRect();
-    setCrewDropdownAnchor({
-      x: rect.left + (rect.width / 2),
-      y: rect.bottom + 6,
-    });
-    setActiveCrewDropdown(taskId);
-  };
-
   const toggleStatusDropdown = (taskId: string, anchorEl: HTMLDivElement) => {
     if (activeStatusDropdown === taskId) {
       setActiveStatusDropdown(null);
@@ -522,8 +531,6 @@ export default function TaskBoardPage() {
     }
     setActiveOwnerDropdown(null);
     setOwnerDropdownAnchor(null);
-    setActiveCrewDropdown(null);
-    setCrewDropdownAnchor(null);
     setActivePriorityDropdown(null);
     setPriorityDropdownAnchor(null);
     const rect = anchorEl.getBoundingClientRect();
@@ -542,8 +549,6 @@ export default function TaskBoardPage() {
     }
     setActiveOwnerDropdown(null);
     setOwnerDropdownAnchor(null);
-    setActiveCrewDropdown(null);
-    setCrewDropdownAnchor(null);
     setActiveStatusDropdown(null);
     setStatusDropdownAnchor(null);
     const rect = anchorEl.getBoundingClientRect();
@@ -555,12 +560,10 @@ export default function TaskBoardPage() {
   };
 
   useEffect(() => {
-    if (!activeOwnerDropdown && !activeCrewDropdown && !activeStatusDropdown && !activePriorityDropdown) return;
+    if (!activeOwnerDropdown && !activeStatusDropdown && !activePriorityDropdown) return;
     const closeDropdowns = () => {
       setActiveOwnerDropdown(null);
       setOwnerDropdownAnchor(null);
-      setActiveCrewDropdown(null);
-      setCrewDropdownAnchor(null);
       setActiveStatusDropdown(null);
       setStatusDropdownAnchor(null);
       setActivePriorityDropdown(null);
@@ -572,7 +575,7 @@ export default function TaskBoardPage() {
       window.removeEventListener('scroll', closeDropdowns, true);
       window.removeEventListener('resize', closeDropdowns);
     };
-  }, [activeOwnerDropdown, activeCrewDropdown, activeStatusDropdown, activePriorityDropdown]);
+  }, [activeOwnerDropdown, activeStatusDropdown, activePriorityDropdown]);
 
   const openDeleteTaskModal = (task: Task) => {
     setPendingDeleteTask(task);
@@ -669,10 +672,10 @@ export default function TaskBoardPage() {
             todayDone: twoDayCompletionReport.todayDoneCount,
             yesterdayDone: twoDayCompletionReport.yesterdayDoneCount,
             todayTasks: twoDayCompletionReport.todayItems.map(
-              (item) => `${item.name} (Owner: ${item.ownerLabel}${item.crewLabel !== '-' ? `; Crew: ${item.crewLabel}` : ''})`
+              (item) => `${item.name} (Owner: ${item.ownerLabel})`
             ),
             yesterdayTasks: twoDayCompletionReport.yesterdayItems.map(
-              (item) => `${item.name} (Owner: ${item.ownerLabel}${item.crewLabel !== '-' ? `; Crew: ${item.crewLabel}` : ''})`
+              (item) => `${item.name} (Owner: ${item.ownerLabel})`
             ),
             todayMore: twoDayCompletionReport.todayMoreCount,
             yesterdayMore: twoDayCompletionReport.yesterdayMoreCount,
@@ -946,28 +949,87 @@ export default function TaskBoardPage() {
             </div>
           )}
           {activeProject && showProjectSettings && (
-            <div className="mt-2 max-w-[460px] rounded-xl border border-[#d0d4e4] bg-[#f8fafc] p-3 flex flex-col gap-2">
-              <label className="text-[12px] font-medium text-[#495d71]">ชื่อโครงการ</label>
-              <input
-                type="text"
-                value={projectNameDraft}
-                onChange={(e) => setProjectNameDraft(e.target.value)}
-                placeholder="ชื่อโครงการ"
-                className="w-full rounded-lg border border-[#c4cede] bg-white px-3 py-2 text-[13px] text-[#233548] outline-none focus:border-[#0073ea] focus:ring-2 focus:ring-[#0073ea]/20"
-              />
-              <label className="text-[12px] font-medium text-[#495d71]">สถานะโครงการ</label>
-              <select
-                value={projectStatusDraft}
-                onChange={(e) => setProjectStatusDraft(e.target.value as Project['status'])}
-                className="w-full rounded-lg border border-[#c4cede] bg-white px-3 py-2 text-[13px] text-[#233548] outline-none focus:border-[#0073ea] focus:ring-2 focus:ring-[#0073ea]/20"
-              >
-                {PROJECT_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {getProjectStatusLabel(status)}
-                  </option>
-                ))}
-              </select>
-              <div className="mt-1 flex items-center justify-end gap-2">
+            <div className="mt-3 w-full max-w-[820px] rounded-2xl border border-[#d0d4e4] bg-[#f8fafc] p-3 sm:p-4 shadow-[0_8px_24px_rgba(15,23,42,0.035)]">
+              <div className="grid gap-3 lg:grid-cols-2">
+                <div className="space-y-2 rounded-xl border border-[#d9e2ef] bg-white/80 p-3">
+                  <div>
+                    <div className="text-[13px] font-semibold text-[#233548]">ข้อมูลโครงการ</div>
+                    <div className="mt-0.5 text-[11px] text-[#6b7e92]">ตั้งค่าชื่อและสถานะของโครงการ</div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="grid gap-1.5 sm:grid-cols-[88px_minmax(0,1fr)] sm:items-center sm:gap-3">
+                      <label className="text-[12px] font-medium text-[#495d71]">ชื่อโครงการ</label>
+                      <input
+                        type="text"
+                        value={projectNameDraft}
+                        onChange={(e) => setProjectNameDraft(e.target.value)}
+                        placeholder="ชื่อโครงการ"
+                        className="w-full rounded-lg border border-[#c4cede] bg-white px-3 py-1.5 text-[13px] text-[#233548] outline-none focus:border-[#0073ea] focus:ring-2 focus:ring-[#0073ea]/20"
+                      />
+                    </div>
+                    <div className="grid gap-1.5 sm:grid-cols-[88px_minmax(0,1fr)] sm:items-center sm:gap-3">
+                      <label className="text-[12px] font-medium text-[#495d71]">สถานะโครงการ</label>
+                      <select
+                        value={projectStatusDraft}
+                        onChange={(e) => setProjectStatusDraft(e.target.value as Project['status'])}
+                        className="w-full rounded-lg border border-[#c4cede] bg-white px-3 py-1.5 text-[13px] text-[#233548] outline-none focus:border-[#0073ea] focus:ring-2 focus:ring-[#0073ea]/20"
+                      >
+                        {PROJECT_STATUSES.map((status) => (
+                          <option key={status} value={status}>
+                            {getProjectStatusLabel(status)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2 rounded-xl border border-[#d9e2ef] bg-white/80 p-3">
+                  <div>
+                    <div className="text-[13px] font-semibold text-[#233548]">ขอบเขตโครงการ</div>
+                    <div className="mt-0.5 text-[11px] text-[#6b7e92]">กำหนดสาขาและแผนกหลักของงานในโครงการนี้</div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="grid gap-1.5 sm:grid-cols-[72px_minmax(0,1fr)] sm:items-center sm:gap-3">
+                      <label className="text-[12px] font-medium text-[#495d71]">สาขา</label>
+                      <select
+                        value={projectBranchDraft}
+                        onChange={(e) => {
+                          const nextBranchId = e.target.value;
+                          setProjectBranchDraft(nextBranchId);
+                          const nextDepartmentOptions = taskScopeDepartmentOptions.filter(
+                            (option) => !option.branchId || option.branchId === nextBranchId
+                          );
+                          if (!nextDepartmentOptions.some((option) => option.id === projectDepartmentDraft)) {
+                            setProjectDepartmentDraft(nextDepartmentOptions[0]?.id || DEFAULT_DEPARTMENT_ID);
+                          }
+                        }}
+                        className="w-full rounded-lg border border-[#c4cede] bg-white px-3 py-1.5 text-[13px] text-[#233548] outline-none focus:border-[#0073ea] focus:ring-2 focus:ring-[#0073ea]/20"
+                      >
+                        {taskScopeBranchOptions.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="grid gap-1.5 sm:grid-cols-[72px_minmax(0,1fr)] sm:items-center sm:gap-3">
+                      <label className="text-[12px] font-medium text-[#495d71]">แผนก</label>
+                      <select
+                        value={projectDepartmentDraft}
+                        onChange={(e) => setProjectDepartmentDraft(e.target.value)}
+                        className="w-full rounded-lg border border-[#c4cede] bg-white px-3 py-1.5 text-[13px] text-[#233548] outline-none focus:border-[#0073ea] focus:ring-2 focus:ring-[#0073ea]/20"
+                      >
+                        {projectDepartmentOptions.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-end gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => void handleDeleteProject()}
@@ -982,6 +1044,8 @@ export default function TaskBoardPage() {
                   onClick={() => {
                     setProjectNameDraft(activeProject.name);
                     setProjectStatusDraft(activeProject.status);
+                    setProjectBranchDraft(activeProjectBranchId);
+                    setProjectDepartmentDraft(activeProjectDepartmentId);
                     setShowProjectSettings(false);
                   }}
                   className="px-3 py-1.5 rounded-lg border border-[#cfd6e4] bg-white text-[#4a5f75] text-[12px] font-medium hover:bg-[#eef2f8]"
@@ -1001,16 +1065,6 @@ export default function TaskBoardPage() {
           )}
         </div>
         <div className="flex items-center gap-2 sm:gap-3 w-full lg:w-auto flex-wrap">
-          <div className="relative flex-1 min-w-[180px]">
-            <Search className="absolute left-3 top-2.5 h-[18px] w-[18px] text-[#676879]" />
-            <input
-              type="text"
-              placeholder="ค้นหางาน..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-[#f5f6f8] border border-[#d0d4e4] rounded-full text-[15px] focus:ring-2 focus:ring-[#0073ea] focus:border-[#0073ea] outline-none w-full sm:w-56 transition-all focus:bg-white placeholder:text-[#676879]"
-            />
-          </div>
           <input
             type="file"
             accept=".csv"
@@ -1076,7 +1130,17 @@ export default function TaskBoardPage() {
           </div>
 
           {/* Filter & Sort controls */}
-          <div className="flex items-center gap-2 pb-3 flex-wrap">
+          <div className="flex items-center gap-2 pb-3 flex-wrap lg:justify-end">
+            <div className="relative w-full sm:w-[240px] lg:w-[280px]">
+              <Search className="absolute left-3 top-2.5 h-[18px] w-[18px] text-[#676879]" />
+              <input
+                type="text"
+                placeholder="ค้นหางาน..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-full border border-[#d0d4e4] bg-[#f5f6f8] py-2 pl-9 pr-4 text-[14px] text-[#323338] outline-none transition-all placeholder:text-[#8b96a8] focus:border-[#0073ea] focus:bg-white focus:ring-2 focus:ring-[#0073ea]/15"
+              />
+            </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors border ${showFilters || hasActiveFilters
@@ -1145,7 +1209,7 @@ export default function TaskBoardPage() {
             >
               <option value="all">ผู้รับผิดชอบทั้งหมด</option>
               <option value="unassigned">ยังไม่ระบุ</option>
-              {teamMembers.filter((member) => member.memberType !== 'crew').map(m => (
+              {teamMembers.map(m => (
                 <option key={m.id} value={m.name}>{m.name}</option>
               ))}
             </select>
@@ -1323,7 +1387,6 @@ export default function TaskBoardPage() {
                         <tr className="border-b border-[#d0d4e4] text-[#676879] font-normal bg-white">
                           <th className="px-4 py-3 md:sticky md:left-0 md:z-10 w-[340px] font-normal border-r border-[#d0d4e4]">งาน</th>
                           <th className="px-4 py-3 w-[120px] font-normal border-r border-[#d0d4e4] text-center">ผู้รับผิดชอบ</th>
-                          <th className="px-4 py-3 w-[120px] font-normal border-r border-[#d0d4e4] text-center">ทีมช่าง</th>
                           <th className="px-0 py-3 w-[140px] font-normal border-r border-[#d0d4e4] text-center">สถานะ</th>
                           <th className="px-0 py-3 w-[100px] font-normal border-r border-[#d0d4e4] text-center">ความสำคัญ</th>
                           <th className="px-4 py-3 w-[220px] font-normal border-r border-[#d0d4e4] text-center">กำหนดเวลา</th>
@@ -1336,14 +1399,10 @@ export default function TaskBoardPage() {
                           const dueSoon = isDueSoon(task);
                           const assignment = assignmentByTaskId.get(task.id);
                           const ownerNames = assignment?.ownerNames || [];
-                          const crewNames = assignment?.crewNames || [];
                           const visibleOwnerNames = ownerNames.slice(0, 3);
                           const additionalOwnerCount = Math.max(ownerNames.length - visibleOwnerNames.length, 0);
-                          const crewDisplayLabel = crewNames.length === 0
-                            ? '-'
-                            : crewNames.join(', ');
                           return (
-                            <tr key={task.id} className={`border-b border-[#e6e9ef] last:border-0 hover:bg-[#f5f6f8] group transition-colors ${activeOwnerDropdown === task.id || activeCrewDropdown === task.id || activeStatusDropdown === task.id || activePriorityDropdown === task.id ? 'relative z-50' : 'relative z-0'} ${overdue ? 'bg-[#fff5f5]' : ''}`}>
+                            <tr key={task.id} className={`border-b border-[#e6e9ef] last:border-0 hover:bg-[#f5f6f8] group transition-colors ${activeOwnerDropdown === task.id || activeStatusDropdown === task.id || activePriorityDropdown === task.id ? 'relative z-50' : 'relative z-0'} ${overdue ? 'bg-[#fff5f5]' : ''}`}>
                               {/* Item Name */}
                               <td className={`px-0 py-0 md:sticky md:left-0 ${overdue ? 'bg-[#fff5f5]' : 'bg-white'} group-hover:bg-[#f5f6f8] border-r border-[#d0d4e4] transition-colors`}>
                                 <div className="flex items-stretch h-[44px]">
@@ -1437,11 +1496,11 @@ export default function TaskBoardPage() {
                                     <div className="max-h-64 overflow-y-auto mt-1">
                                       <div
                                         className="px-3 py-2 text-sm hover:bg-[#f5f6f8] cursor-pointer text-[#676879] italic border-b border-[#e6e9ef]"
-                                        onClick={() => { handleUpdateTaskOwners(task.id, [...crewNames]); }}
+                                        onClick={() => { handleUpdateTaskOwners(task.id, []); }}
                                       >
                                         ไม่ได้กำหนดผู้รับผิดชอบ
                                       </div>
-                                      {teamMembers.filter((member) => member.memberType !== 'crew').map(member => (
+                                      {teamMembers.map(member => (
                                         <div
                                           key={member.id}
                                           className={`px-3 py-2 text-sm hover:bg-[#f5f6f8] cursor-pointer border-b border-[#e6e9ef] last:border-0 ${ownerNames.includes(member.name) ? 'bg-[#cce5ff]' : ''}`}
@@ -1449,7 +1508,7 @@ export default function TaskBoardPage() {
                                             const nextOwners = ownerNames.includes(member.name)
                                               ? ownerNames.filter((owner) => owner !== member.name)
                                               : [...ownerNames, member.name];
-                                            handleUpdateTaskOwners(task.id, [...nextOwners, ...crewNames]);
+                                            handleUpdateTaskOwners(task.id, nextOwners);
                                           }}
                                         >
                                           <div className={`font-medium flex items-center justify-between ${ownerNames.includes(member.name) ? 'text-[#0052cc]' : 'text-[#323338]'}`}>
@@ -1470,73 +1529,6 @@ export default function TaskBoardPage() {
                                         onClick={() => {
                                           setActiveOwnerDropdown(null);
                                           setOwnerDropdownAnchor(null);
-                                        }}
-                                        className="text-[11px] px-2 py-1 rounded bg-[#f5f6f8] hover:bg-[#e6e9ef] text-[#323338]"
-                                      >
-                                        เสร็จสิ้น
-                                      </button>
-                                    </div>
-                                  </div>,
-                                  document.body
-                                )}
-                              </td>
-                              {/* Crew */}
-                              <td className={`px-2 py-0 border-r border-[#d0d4e4] h-[44px] relative ${activeCrewDropdown === task.id ? 'z-50' : ''}`}>
-                                <div
-                                  className="w-full h-full flex justify-center items-center cursor-pointer hover:bg-[#e6e9ef]/50 transition-colors"
-                                  onClick={(e) => toggleCrewDropdown(task.id, e.currentTarget)}
-                                  title={crewNames.length === 0 ? '-' : crewDisplayLabel}
-                                >
-                                  <div className={`max-w-full text-center text-[12px] px-2 truncate ${crewNames.length === 0 ? 'text-[#676879]' : 'text-[#323338]'}`}>
-                                    {crewDisplayLabel}
-                                  </div>
-                                </div>
-                                {activeCrewDropdown === task.id && crewDropdownAnchor && createPortal(
-                                  <div
-                                    className="fixed w-48 bg-white rounded-lg shadow-xl border border-[#d0d4e4] z-[220] py-2"
-                                    style={{
-                                      left: crewDropdownAnchor.x,
-                                      top: crewDropdownAnchor.y,
-                                      transform: 'translateX(-50%)',
-                                    }}
-                                  >
-                                    <div className="px-3 py-1 text-xs font-semibold text-[#676879] uppercase tracking-wider">กำหนดทีมช่าง</div>
-                                    <div className="max-h-64 overflow-y-auto mt-1">
-                                      <div
-                                        className="px-3 py-2 text-sm hover:bg-[#f5f6f8] cursor-pointer text-[#676879] italic border-b border-[#e6e9ef]"
-                                        onClick={() => { handleUpdateTaskOwners(task.id, [...ownerNames]); }}
-                                      >
-                                        ไม่มีทีมช่าง
-                                      </div>
-                                      {teamMembers.filter((member) => member.memberType === 'crew').map(member => (
-                                        <div
-                                          key={member.id}
-                                          className={`px-3 py-2 text-sm hover:bg-[#f5f6f8] cursor-pointer border-b border-[#e6e9ef] last:border-0 ${crewNames.includes(member.name) ? 'bg-[#ffe9c7]' : ''}`}
-                                          onClick={() => {
-                                            const nextCrew = crewNames.includes(member.name)
-                                              ? crewNames.filter((name) => name !== member.name)
-                                              : [...crewNames, member.name];
-                                            handleUpdateTaskOwners(task.id, [...ownerNames, ...nextCrew]);
-                                          }}
-                                        >
-                                          <div className={`font-medium flex items-center justify-between ${crewNames.includes(member.name) ? 'text-[#b05b00]' : 'text-[#323338]'}`}>
-                                            {member.name}
-                                            {crewNames.includes(member.name) && (
-                                              <Check className="w-3.5 h-3.5 text-[#fdab3d]" />
-                                            )}
-                                          </div>
-                                          <div className="text-xs text-[#676879] mt-0.5">
-                                            {member.position} - {member.department}
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                    <div className="px-3 pt-2 mt-1 border-t border-[#e6e9ef] flex items-center justify-between">
-                                      <span className="text-[11px] text-[#676879]">{crewNames.length} รายการที่เลือก</span>
-                                      <button
-                                        onClick={() => {
-                                          setActiveCrewDropdown(null);
-                                          setCrewDropdownAnchor(null);
                                         }}
                                         className="text-[11px] px-2 py-1 rounded bg-[#f5f6f8] hover:bg-[#e6e9ef] text-[#323338]"
                                       >

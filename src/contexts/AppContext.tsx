@@ -32,7 +32,13 @@ import {
     upsertNotificationSettings as fbUpsertNotificationSettings,
     seedInitialData,
 } from '@/lib/firestore';
-import { DEFAULT_BRANCH_ID, DEFAULT_DEPARTMENT_ID, DEFAULT_ORG_ID } from '@/lib/scope';
+import {
+    DEFAULT_BRANCH_ID,
+    DEFAULT_DEPARTMENT_ID,
+    DEFAULT_ORG_ID,
+    isLegacyDefaultBranchId,
+    isLegacyDefaultDepartmentId,
+} from '@/lib/scope';
 import { canAccessScopedRecord, canSelectScope, resolveUserScope } from '@/lib/rbac';
 
 interface TaskUpdate {
@@ -60,6 +66,8 @@ interface AppContextType {
     setScopeDepartmentId: React.Dispatch<React.SetStateAction<string>>;
     scopeBranchOptions: Array<{ id: string; label: string }>;
     scopeDepartmentOptions: Array<{ id: string; label: string }>;
+    taskScopeBranchOptions: Array<{ id: string; label: string }>;
+    taskScopeDepartmentOptions: Array<{ id: string; label: string; branchId?: string }>;
     canSelectScope: boolean;
     loading: boolean;
     dataSource: 'firebase' | 'local';
@@ -74,7 +82,13 @@ interface AppContextType {
     taskUpdates: Record<string, TaskUpdate[]>;
     addTaskUpdate: (taskId: string, text: string) => Promise<void>;
     createWorkspace: (name: string, code?: string) => Promise<void>;
-    updateWorkspace: (projectId: string, name: string, code?: string, status?: Project['status']) => Promise<void>;
+    updateWorkspace: (
+        projectId: string,
+        name: string,
+        code?: string,
+        status?: Project['status'],
+        scope?: { branchId?: string; departmentId?: string }
+    ) => Promise<void>;
     deleteWorkspace: (projectId: string) => Promise<void>;
 
     // Sub-tasks
@@ -109,6 +123,7 @@ interface AppContextType {
     handleUpdateTaskPriority: (taskId: string, newPriority: TaskPriorityInput) => void;
     handleUpdateTaskEstimatedHours: (taskId: string, newHours: string) => void;
     handleUpdateTaskDescription: (taskId: string, description: string) => void;
+    handleUpdateTaskScope: (taskId: string, scope: { branchId: string; departmentId: string }) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -234,13 +249,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
         [tasks, roleScopedProjectIdSet, userScope]
     );
 
-    const availableBranchIds = useMemo(() => {
+    const allAccessibleBranchIds = useMemo(() => {
         const branchIds = new Set<string>();
-        roleScopedProjects.forEach((project) => branchIds.add(project.branchId || DEFAULT_BRANCH_ID));
-        roleScopedTasks.forEach((task) => branchIds.add(task.branchId || DEFAULT_BRANCH_ID));
-        roleScopedTeamMembers.forEach((member) => branchIds.add(member.branchId || DEFAULT_BRANCH_ID));
-        userScope.branchIds.forEach((branchId) => branchIds.add(branchId || DEFAULT_BRANCH_ID));
-        scopeCatalogBranches.forEach((branch) => branchIds.add(branch.id || DEFAULT_BRANCH_ID));
+        roleScopedProjects.forEach((project) => {
+            const branchId = project.branchId || DEFAULT_BRANCH_ID;
+            if (!isLegacyDefaultBranchId(branchId)) branchIds.add(branchId);
+        });
+        roleScopedTasks.forEach((task) => {
+            const branchId = task.branchId || DEFAULT_BRANCH_ID;
+            if (!isLegacyDefaultBranchId(branchId)) branchIds.add(branchId);
+        });
+        roleScopedTeamMembers.forEach((member) => {
+            const branchId = member.branchId || DEFAULT_BRANCH_ID;
+            if (!isLegacyDefaultBranchId(branchId)) branchIds.add(branchId);
+        });
+        userScope.branchIds.forEach((branchId) => {
+            const safeBranchId = branchId || DEFAULT_BRANCH_ID;
+            if (!isLegacyDefaultBranchId(safeBranchId)) branchIds.add(safeBranchId);
+        });
+        scopeCatalogBranches.forEach((branch) => {
+            const branchId = branch.id || DEFAULT_BRANCH_ID;
+            if (!isLegacyDefaultBranchId(branchId)) branchIds.add(branchId);
+        });
         return Array.from(branchIds).filter(Boolean);
     }, [roleScopedProjects, roleScopedTasks, roleScopedTeamMembers, scopeCatalogBranches, userScope.branchIds]);
 
@@ -254,7 +284,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }, [scopeCatalogBranches]);
 
     const scopeBranchOptions = useMemo(() => {
-        const options = availableBranchIds
+        const options = allAccessibleBranchIds
             .sort()
             .map((branchId) => ({ id: branchId, label: branchLabelById.get(branchId) || branchId }));
 
@@ -262,10 +292,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
             return [{ id: ALL_SCOPE_VALUE, label: 'All Branches' }, ...options];
         }
         return options;
-    }, [availableBranchIds, branchLabelById, isScopeSelectionEnabled]);
+    }, [allAccessibleBranchIds, branchLabelById, isScopeSelectionEnabled]);
+
+    const taskScopeBranchOptions = useMemo(() => {
+        return allAccessibleBranchIds
+            .sort()
+            .map((branchId) => ({ id: branchId, label: branchLabelById.get(branchId) || branchId }));
+    }, [allAccessibleBranchIds, branchLabelById]);
 
     const effectiveScopeBranchId = useMemo(() => {
-        const fallbackBranch = scopeBranchOptions[0]?.id || DEFAULT_BRANCH_ID;
+        const fallbackBranch = scopeBranchOptions.find((option) => option.id !== ALL_SCOPE_VALUE)?.id || ALL_SCOPE_VALUE;
         const requestedBranchExists = scopeBranchOptions.some((option) => option.id === scopeBranchId);
 
         if (!requestedBranchExists) return fallbackBranch;
@@ -279,8 +315,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         const includeIfBranchMatch = (branchId?: string, departmentId?: string) => {
             const safeBranchId = branchId || DEFAULT_BRANCH_ID;
+            const safeDepartmentId = departmentId || DEFAULT_DEPARTMENT_ID;
+            if (isLegacyDefaultBranchId(safeBranchId) || isLegacyDefaultDepartmentId(safeDepartmentId)) return;
             if (branchFilter && safeBranchId !== branchFilter) return;
-            departmentIds.add(departmentId || DEFAULT_DEPARTMENT_ID);
+            departmentIds.add(safeDepartmentId);
         };
 
         roleScopedProjects.forEach((project) => includeIfBranchMatch(project.branchId, project.departmentId));
@@ -288,10 +326,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
         roleScopedTeamMembers.forEach((member) => includeIfBranchMatch(member.branchId, member.departmentId));
         scopeCatalogDepartments.forEach((department) => {
             const catalogBranchId = department.branchId || null;
+            const safeDepartmentId = department.id || DEFAULT_DEPARTMENT_ID;
+            if (isLegacyDefaultDepartmentId(safeDepartmentId)) return;
+            if (catalogBranchId && isLegacyDefaultBranchId(catalogBranchId)) return;
             if (branchFilter && catalogBranchId && catalogBranchId !== branchFilter) return;
-            departmentIds.add(department.id || DEFAULT_DEPARTMENT_ID);
+            departmentIds.add(safeDepartmentId);
         });
-        userScope.departmentIds.forEach((departmentId) => departmentIds.add(departmentId || DEFAULT_DEPARTMENT_ID));
+        userScope.departmentIds.forEach((departmentId) => {
+            const safeDepartmentId = departmentId || DEFAULT_DEPARTMENT_ID;
+            if (!isLegacyDefaultDepartmentId(safeDepartmentId)) {
+                departmentIds.add(safeDepartmentId);
+            }
+        });
 
         return Array.from(departmentIds).filter(Boolean);
     }, [effectiveScopeBranchId, roleScopedProjects, roleScopedTasks, roleScopedTeamMembers, scopeCatalogDepartments, userScope.departmentIds]);
@@ -316,8 +362,71 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return options;
     }, [availableDepartmentIds, departmentLabelById, isScopeSelectionEnabled]);
 
+    const taskScopeDepartmentOptions = useMemo(() => {
+        const departmentMap = new Map<string, { id: string; label: string; branchId?: string }>();
+
+        scopeCatalogDepartments.forEach((department) => {
+            const id = department.id || DEFAULT_DEPARTMENT_ID;
+            if (isLegacyDefaultDepartmentId(id)) return;
+            if (department.branchId && isLegacyDefaultBranchId(department.branchId)) return;
+            departmentMap.set(id, {
+                id,
+                label: department.label || id,
+                ...(department.branchId ? { branchId: department.branchId } : {}),
+            });
+        });
+
+        roleScopedProjects.forEach((project) => {
+            const id = project.departmentId || DEFAULT_DEPARTMENT_ID;
+            const branchId = project.branchId || DEFAULT_BRANCH_ID;
+            if (isLegacyDefaultDepartmentId(id) || isLegacyDefaultBranchId(branchId)) return;
+            if (departmentMap.has(id)) return;
+            departmentMap.set(id, {
+                id,
+                label: departmentLabelById.get(id) || id,
+                branchId,
+            });
+        });
+
+        roleScopedTasks.forEach((task) => {
+            const id = task.departmentId || DEFAULT_DEPARTMENT_ID;
+            const branchId = task.branchId || DEFAULT_BRANCH_ID;
+            if (isLegacyDefaultDepartmentId(id) || isLegacyDefaultBranchId(branchId)) return;
+            if (departmentMap.has(id)) return;
+            departmentMap.set(id, {
+                id,
+                label: departmentLabelById.get(id) || id,
+                branchId,
+            });
+        });
+
+        roleScopedTeamMembers.forEach((member) => {
+            const id = member.departmentId || DEFAULT_DEPARTMENT_ID;
+            const branchId = member.branchId || DEFAULT_BRANCH_ID;
+            if (isLegacyDefaultDepartmentId(id) || isLegacyDefaultBranchId(branchId)) return;
+            if (departmentMap.has(id)) return;
+            departmentMap.set(id, {
+                id,
+                label: departmentLabelById.get(id) || id,
+                branchId,
+            });
+        });
+
+        userScope.departmentIds.forEach((departmentId) => {
+            const safeDepartmentId = departmentId || DEFAULT_DEPARTMENT_ID;
+            if (isLegacyDefaultDepartmentId(safeDepartmentId)) return;
+            if (departmentMap.has(safeDepartmentId)) return;
+            departmentMap.set(safeDepartmentId, {
+                id: safeDepartmentId,
+                label: departmentLabelById.get(safeDepartmentId) || safeDepartmentId,
+            });
+        });
+
+        return Array.from(departmentMap.values()).sort((a, b) => a.id.localeCompare(b.id));
+    }, [departmentLabelById, roleScopedProjects, roleScopedTasks, roleScopedTeamMembers, scopeCatalogDepartments, userScope.departmentIds]);
+
     const effectiveScopeDepartmentId = useMemo(() => {
-        const fallbackDepartment = scopeDepartmentOptions[0]?.id || DEFAULT_DEPARTMENT_ID;
+        const fallbackDepartment = scopeDepartmentOptions.find((option) => option.id !== ALL_SCOPE_VALUE)?.id || ALL_SCOPE_VALUE;
         const requestedDepartmentExists = scopeDepartmentOptions.some((option) => option.id === scopeDepartmentId);
 
         if (!requestedDepartmentExists) return fallbackDepartment;
@@ -387,8 +496,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setTeamMembers([]);
         setScopeBranchId(ALL_SCOPE_VALUE);
         setScopeDepartmentId(ALL_SCOPE_VALUE);
-        setScopeCatalogBranches([{ id: DEFAULT_BRANCH_ID, label: DEFAULT_BRANCH_ID }]);
-        setScopeCatalogDepartments([{ id: DEFAULT_DEPARTMENT_ID, label: DEFAULT_DEPARTMENT_ID, branchId: DEFAULT_BRANCH_ID }]);
+        setScopeCatalogBranches([]);
+        setScopeCatalogDepartments([]);
         setActiveProjectId(null);
         setNotificationSettings(DEFAULT_NOTIFICATION_SETTINGS);
     }, []);
@@ -727,16 +836,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setActiveProjectId(localProjectId);
     }, [currentUserName, dataSource, resolveWriteScope]);
 
-    const updateWorkspace = useCallback(async (projectId: string, name: string, code?: string, status?: Project['status']) => {
+    const updateWorkspace = useCallback(async (
+        projectId: string,
+        name: string,
+        code?: string,
+        status?: Project['status'],
+        scope?: { branchId?: string; departmentId?: string }
+    ) => {
         const trimmedName = name.trim();
         const trimmedCode = (code || '').trim();
         if (!trimmedName) return;
+        const nextBranchId = scope?.branchId || DEFAULT_BRANCH_ID;
+        const nextDepartmentId = scope?.departmentId || DEFAULT_DEPARTMENT_ID;
 
         if (dataSource === 'firebase') {
             await fbUpdateProject(projectId, {
                 name: trimmedName,
                 code: trimmedCode || undefined,
                 status,
+                branchId: nextBranchId,
+                departmentId: nextDepartmentId,
             });
             return;
         }
@@ -749,6 +868,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
                         name: trimmedName,
                         code: trimmedCode || undefined,
                         ...(status ? { status } : {}),
+                        branchId: nextBranchId,
+                        departmentId: nextDepartmentId,
                         updatedAt: new Date().toISOString(),
                     }
                     : p
@@ -1019,6 +1140,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
     }, [dataSource, updateTaskInState]);
 
+    const handleUpdateTaskScope = useCallback(async (
+        taskId: string,
+        scope: { branchId: string; departmentId: string }
+    ) => {
+        const task = tasks.find((item) => item.id === taskId);
+        if (!task) return;
+
+        const nextBranchId = scope.branchId || DEFAULT_BRANCH_ID;
+        const nextDepartmentId = scope.departmentId || DEFAULT_DEPARTMENT_ID;
+        const previousBranchId = task.branchId || DEFAULT_BRANCH_ID;
+        const previousDepartmentId = task.departmentId || DEFAULT_DEPARTMENT_ID;
+
+        if (previousBranchId === nextBranchId && previousDepartmentId === nextDepartmentId) {
+            return;
+        }
+
+        if (previousBranchId !== nextBranchId) {
+            logActivity(taskId, 'scope_changed', 'branchId', previousBranchId, nextBranchId);
+        }
+        if (previousDepartmentId !== nextDepartmentId) {
+            logActivity(taskId, 'scope_changed', 'departmentId', previousDepartmentId, nextDepartmentId);
+        }
+
+        updateTaskInState(taskId, (currentTask) => ({
+            ...currentTask,
+            branchId: nextBranchId,
+            departmentId: nextDepartmentId,
+        }));
+
+        if (dataSource === 'firebase') {
+            await fbUpdateTask(taskId, {
+                branchId: nextBranchId,
+                departmentId: nextDepartmentId,
+            });
+        }
+    }, [dataSource, logActivity, tasks, updateTaskInState]);
+
     return (
         <AppContext.Provider value={{
             projects: selectedScopedProjects, setProjects,
@@ -1028,6 +1186,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
             scopeDepartmentId: effectiveScopeDepartmentId, setScopeDepartmentId,
             scopeBranchOptions,
             scopeDepartmentOptions,
+            taskScopeBranchOptions,
+            taskScopeDepartmentOptions,
             canSelectScope: isScopeSelectionEnabled,
             loading,
             dataSource,
@@ -1049,6 +1209,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             handleUpdateTaskProgress, handleUpdateTaskPriority,
             handleUpdateTaskEstimatedHours,
             handleUpdateTaskDescription,
+            handleUpdateTaskScope,
         }}>
             {children}
         </AppContext.Provider>

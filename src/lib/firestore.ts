@@ -249,6 +249,11 @@ export async function getSystemUserAccountById(id: string): Promise<SystemUserAc
     return normalizeSystemUserDoc({ ...snapshot.data(), id: snapshot.id } as SystemUserAccount);
 }
 
+export async function getSystemUserAccounts(): Promise<SystemUserAccount[]> {
+    const snapshot = await getDocs(collection(db, 'systemUsers'));
+    return snapshot.docs.map((docItem) => normalizeSystemUserDoc({ ...docItem.data(), id: docItem.id } as SystemUserAccount));
+}
+
 export function subscribeSystemUserAccounts(callback: (users: SystemUserAccount[]) => void) {
     return onSnapshot(collection(db, 'systemUsers'), (snapshot) => {
         const users = snapshot.docs

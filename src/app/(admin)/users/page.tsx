@@ -6,6 +6,7 @@ import UserManagementView from '@/components/UserManagementView';
 import { useAppContext } from '@/contexts/AppContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfirmModal } from '@/contexts/ConfirmModalContext';
+import { auth, hasFirebaseConfig } from '@/lib/firebase';
 import {
     deleteTeamMember as fbDeleteTeamMember,
     deleteSystemUserAccount as fbDeleteSystemUserAccount,
@@ -23,6 +24,11 @@ import {
     DEFAULT_SYSTEM_USER_ROLE,
 } from '@/lib/scope';
 
+function isFirebaseAdminConfigErrorMessage(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error || '');
+    return message.includes('Firebase Admin is not configured') || message.includes('Could not load the default credentials');
+}
+
 export default function UsersPage() {
     const {
         teamMembers,
@@ -33,6 +39,8 @@ export default function UsersPage() {
         dataSource,
         scopeBranchId,
         scopeDepartmentId,
+        taskScopeBranchOptions,
+        taskScopeDepartmentOptions,
     } = useAppContext();
     const { user } = useAuth();
     const modal = useConfirmModal();
@@ -50,6 +58,85 @@ export default function UsersPage() {
         );
         return normalized.length > 0 ? normalized : [fallback];
     }, []);
+    const resolveSystemUserScopeByRole = useCallback((role?: SystemUserAccount['role']) => {
+        const normalizedRole = role || DEFAULT_SYSTEM_USER_ROLE;
+        if (normalizedRole === 'super_admin') {
+            return {
+                role: normalizedRole,
+                branchId: DEFAULT_BRANCH_ID,
+                departmentId: DEFAULT_DEPARTMENT_ID,
+                branchIds: [DEFAULT_BRANCH_ID],
+                departmentIds: [DEFAULT_DEPARTMENT_ID],
+            };
+        }
+
+        const branchIds = normalizeIdList(undefined, branchScopeId);
+        const departmentIds = normalizeIdList(undefined, departmentScopeId);
+        return {
+            role: normalizedRole,
+            branchId: branchIds[0],
+            departmentId: departmentIds[0],
+            branchIds,
+            departmentIds,
+        };
+    }, [branchScopeId, departmentScopeId, normalizeIdList]);
+    const getSystemUserApiHeaders = useCallback(async () => {
+        if (!hasFirebaseConfig || !auth.currentUser) {
+            throw new Error('ไม่พบเซสชันผู้ใช้ปัจจุบัน กรุณาเข้าสู่ระบบใหม่');
+        }
+
+        const token = await auth.currentUser.getIdToken();
+        return {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        };
+    }, []);
+    const requestSystemUserApi = useCallback(async <TResponse,>(path: string, init: RequestInit): Promise<TResponse> => {
+        const headers = new Headers(init.headers);
+        const authHeaders = await getSystemUserApiHeaders();
+        Object.entries(authHeaders).forEach(([key, value]) => {
+            headers.set(key, value);
+        });
+
+        const response = await fetch(path, {
+            ...init,
+            headers,
+        });
+        const payload = await response.json().catch(() => null) as { error?: string } | null;
+        if (!response.ok) {
+            throw new Error(payload?.error || 'ไม่สามารถดำเนินการกับผู้ใช้ระบบได้');
+        }
+        return (payload || {}) as TResponse;
+    }, [getSystemUserApiHeaders]);
+    const upsertSystemUserMetadata = useCallback(async (id: string, payload: {
+        username: string;
+        email: string;
+        displayName: string;
+        authProvider: SystemUserAccount['authProvider'];
+        role?: SystemUserAccount['role'];
+        phone?: string;
+        lineUserId?: string;
+        createdAt?: string;
+        lastLoginAt?: string;
+    }) => {
+        const scopedRole = resolveSystemUserScopeByRole(payload.role);
+        await upsertSystemUserAccount(id, {
+            username: payload.username.trim(),
+            email: payload.email.trim().toLowerCase(),
+            displayName: payload.displayName.trim(),
+            authProvider: payload.authProvider,
+            orgId: orgScopeId,
+            branchId: scopedRole.branchId,
+            departmentId: scopedRole.departmentId,
+            role: scopedRole.role,
+            branchIds: scopedRole.branchIds,
+            departmentIds: scopedRole.departmentIds,
+            phone: payload.phone?.trim() || '',
+            lineUserId: payload.lineUserId?.trim() || '',
+            ...(payload.createdAt ? { createdAt: payload.createdAt } : {}),
+            ...(payload.lastLoginAt ? { lastLoginAt: payload.lastLoginAt } : {}),
+        });
+    }, [orgScopeId, resolveSystemUserScopeByRole]);
 
     useEffect(() => {
         if (dataSource !== 'firebase') return;
@@ -184,9 +271,8 @@ export default function UsersPage() {
         email: string;
         displayName: string;
         authProvider: SystemUserAccount['authProvider'];
+        password?: string;
         role?: SystemUserAccount['role'];
-        branchIds?: string[];
-        departmentIds?: string[];
         phone?: string;
         lineUserId?: string;
     }) => {
@@ -195,46 +281,92 @@ export default function UsersPage() {
             return;
         }
 
-        const id = payload.id?.trim() || `su-${Date.now()}`;
+        const id = payload.id?.trim() || (payload.authProvider === 'line' ? `su-${Date.now()}` : '');
         const nowIso = new Date().toISOString();
-        const branchIds = normalizeIdList(payload.branchIds, branchScopeId);
-        const departmentIds = normalizeIdList(payload.departmentIds, departmentScopeId);
+        const scopedRole = resolveSystemUserScopeByRole(payload.role);
+        const metadataPayload = {
+            username: payload.username.trim(),
+            email: payload.email.trim().toLowerCase(),
+            displayName: payload.displayName.trim(),
+            authProvider: payload.authProvider,
+            role: scopedRole.role,
+            phone: payload.phone?.trim() || '',
+            lineUserId: payload.lineUserId?.trim() || '',
+            createdAt: nowIso,
+        };
         try {
-            await upsertSystemUserAccount(id, {
-                username: payload.username.trim(),
-                email: payload.email.trim().toLowerCase(),
-                displayName: payload.displayName.trim(),
-                authProvider: payload.authProvider,
-                orgId: orgScopeId,
-                branchId: branchIds[0],
-                departmentId: departmentIds[0],
-                role: payload.role || DEFAULT_SYSTEM_USER_ROLE,
-                branchIds,
-                departmentIds,
-                phone: payload.phone?.trim() || '',
-                lineUserId: payload.lineUserId?.trim() || '',
-                createdAt: nowIso,
-            });
+            if (payload.authProvider === 'password') {
+                await requestSystemUserApi<{ id: string }>('/api/system-users', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        id,
+                        ...metadataPayload,
+                        password: payload.password?.trim() || '',
+                        orgId: orgScopeId,
+                        branchId: scopedRole.branchId,
+                        departmentId: scopedRole.departmentId,
+                        role: scopedRole.role,
+                        branchIds: scopedRole.branchIds,
+                        departmentIds: scopedRole.departmentIds,
+                    }),
+                });
+                return;
+            }
+
+            await upsertSystemUserMetadata(id, metadataPayload);
         } catch (error) {
             console.error('Failed to add system user:', error);
-            void modal.error('ไม่สามารถเพิ่มผู้ใช้ระบบได้ โปรดลองอีกครั้ง');
+            if (isFirebaseAdminConfigErrorMessage(error) && payload.authProvider !== 'password') {
+                await upsertSystemUserMetadata(id, metadataPayload);
+                return;
+            }
+            void modal.error(error instanceof Error ? error.message : 'ไม่สามารถเพิ่มผู้ใช้ระบบได้ โปรดลองอีกครั้ง');
         }
-    }, [branchScopeId, dataSource, departmentScopeId, modal, normalizeIdList, orgScopeId]);
+    }, [dataSource, modal, orgScopeId, requestSystemUserApi, resolveSystemUserScopeByRole, upsertSystemUserMetadata]);
 
-    const handleUpdateSystemUser = useCallback(async (userId: string, patch: Partial<SystemUserAccount>) => {
+    const handleUpdateSystemUser = useCallback(async (userId: string, patch: Partial<SystemUserAccount> & { password?: string }) => {
         if (dataSource !== 'firebase') {
             void modal.alert('การจัดการผู้ใช้ระบบมีให้ใช้งานในโหมด Firebase เท่านั้น', { variant: 'warning' });
             return;
         }
         try {
-            const safePatch: Partial<SystemUserAccount> = { ...patch };
+            const safePatch: Partial<SystemUserAccount> & { password?: string } = { ...patch };
             delete safePatch.id;
-            await upsertSystemUserAccount(userId, safePatch);
+            const scopedRole = resolveSystemUserScopeByRole(safePatch.role);
+            safePatch.role = scopedRole.role;
+            safePatch.branchId = scopedRole.branchId;
+            safePatch.departmentId = scopedRole.departmentId;
+            safePatch.branchIds = scopedRole.branchIds;
+            safePatch.departmentIds = scopedRole.departmentIds;
+            const password = safePatch.password?.trim() || '';
+            const needsPasswordUpdate = password.length > 0;
+            const metadataPatch: Partial<SystemUserAccount> = {
+                ...safePatch,
+                password: undefined,
+            } as Partial<SystemUserAccount>;
+
+            if (!needsPasswordUpdate) {
+                await upsertSystemUserAccount(userId, metadataPatch);
+                return;
+            }
+
+            await requestSystemUserApi<{ ok: true }>(`/api/system-users/${encodeURIComponent(userId)}`, {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    ...safePatch,
+                    password,
+                    orgId: orgScopeId,
+                }),
+            });
         } catch (error) {
             console.error('Failed to update system user:', error);
-            void modal.error('ไม่สามารถอัปเดตผู้ใช้ระบบได้ โปรดลองอีกครั้ง');
+            if (isFirebaseAdminConfigErrorMessage(error)) {
+                void modal.error('ยังไม่ได้ตั้งค่า Firebase Admin credentials จึงเปลี่ยนรหัสผ่านไม่ได้ แต่ยังแก้ข้อมูลทั่วไปได้ตามปกติ');
+                return;
+            }
+            void modal.error(error instanceof Error ? error.message : 'ไม่สามารถอัปเดตผู้ใช้ระบบได้ โปรดลองอีกครั้ง');
         }
-    }, [dataSource, modal]);
+    }, [dataSource, modal, orgScopeId, requestSystemUserApi, resolveSystemUserScopeByRole]);
 
     const handleDeleteSystemUser = useCallback(async (userId: string) => {
         if (dataSource !== 'firebase') {
@@ -242,12 +374,19 @@ export default function UsersPage() {
             return;
         }
         try {
-            await fbDeleteSystemUserAccount(userId);
+            await requestSystemUserApi<{ ok: true }>(`/api/system-users/${encodeURIComponent(userId)}`, {
+                method: 'DELETE',
+            });
         } catch (error) {
             console.error('Failed to delete system user:', error);
-            void modal.error('ไม่สามารถลบผู้ใช้ระบบได้ โปรดลองอีกครั้ง');
+            if (isFirebaseAdminConfigErrorMessage(error)) {
+                await fbDeleteSystemUserAccount(userId);
+                void modal.alert('ลบเฉพาะข้อมูลผู้ใช้ในระบบแล้ว แต่ยังไม่ได้ลบบัญชี Firebase Auth เพราะยังไม่ได้ตั้งค่า Firebase Admin credentials', { variant: 'warning' });
+                return;
+            }
+            void modal.error(error instanceof Error ? error.message : 'ไม่สามารถลบผู้ใช้ระบบได้ โปรดลองอีกครั้ง');
         }
-    }, [dataSource, modal]);
+    }, [dataSource, modal, requestSystemUserApi]);
 
     if (loading) return <LinearLoadingScreen message="กำลังโหลดผู้ใช้งาน..." />;
 
@@ -256,6 +395,8 @@ export default function UsersPage() {
             teamMembers={teamMembers}
             systemUsers={dataSource === 'firebase' ? systemUsers : []}
             tasks={tasks}
+            branchOptions={taskScopeBranchOptions}
+            departmentOptions={taskScopeDepartmentOptions}
             onAddMember={handleAddMember}
             onUpdateMember={handleUpdateMember}
             onDeleteMember={handleDeleteMember}

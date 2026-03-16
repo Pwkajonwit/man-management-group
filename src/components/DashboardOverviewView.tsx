@@ -160,7 +160,7 @@ export default function DashboardOverviewView({ tasks, teamMembers }: DashboardO
                                         </td>
                                         <td className="px-3 py-2.5 align-top">
                                             <div className="text-[12px] font-semibold text-[#323338]">
-                                                {entry.assignedHours}h / {entry.capacity}h
+                                                {entry.assignedHours} ชม. / {entry.capacity} ชม.
                                             </div>
                                             <div className="mt-1 h-1.5 rounded-full bg-[#e7edf5] overflow-hidden">
                                                 <div
@@ -215,19 +215,19 @@ export default function DashboardOverviewView({ tasks, teamMembers }: DashboardO
                 <div className="max-w-[1500px] space-y-6">
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                         <div className="bg-white rounded-xl border border-[#d0d4e4] p-4">
-                            <div className="text-[11px] text-[#676879] uppercase tracking-wider font-semibold">Overdue Tasks</div>
+                            <div className="text-[11px] text-[#676879] uppercase tracking-wider font-semibold">งานเกินกำหนด</div>
                             <div className="text-3xl font-black text-[#e2445c] mt-1">{metrics.overdueTasks.length}</div>
                         </div>
                         <div className="bg-white rounded-xl border border-[#d0d4e4] p-4">
-                            <div className="text-[11px] text-[#676879] uppercase tracking-wider font-semibold">Due Soon (48h)</div>
+                            <div className="text-[11px] text-[#676879] uppercase tracking-wider font-semibold">งานใกล้ครบกำหนด (48 ชม.)</div>
                             <div className="text-3xl font-black text-[#fdab3d] mt-1">{metrics.dueSoonTasks.length}</div>
                         </div>
                         <div className="bg-white rounded-xl border border-[#d0d4e4] p-4">
-                            <div className="text-[11px] text-[#676879] uppercase tracking-wider font-semibold">Unassigned</div>
+                            <div className="text-[11px] text-[#676879] uppercase tracking-wider font-semibold">งานยังไม่มอบหมาย</div>
                             <div className="text-3xl font-black text-[#579bfc] mt-1">{metrics.unassignedTasks.length}</div>
                         </div>
                         <div className="bg-white rounded-xl border border-[#d0d4e4] p-4">
-                            <div className="text-[11px] text-[#676879] uppercase tracking-wider font-semibold">Overloaded Members</div>
+                            <div className="text-[11px] text-[#676879] uppercase tracking-wider font-semibold">สมาชิกที่ภาระงานเกิน</div>
                             <div className="text-3xl font-black text-[#323338] mt-1">{metrics.overloadedMembers.length}</div>
                         </div>
                     </div>
@@ -236,12 +236,12 @@ export default function DashboardOverviewView({ tasks, teamMembers }: DashboardO
                         <div className="bg-white rounded-xl border border-[#d0d4e4] overflow-hidden">
                             <div className="px-5 py-4 border-b border-[#e6e9ef] flex flex-wrap items-center justify-between gap-2">
                                 <div>
-                                    <h2 className="text-[15px] font-bold text-[#323338]">Workload by Group</h2>
-                                    <p className="text-[12px] text-[#676879]">Capacity vs assigned hours</p>
+                                    <h2 className="text-[15px] font-bold text-[#323338]">ภาระงานแยกตามกลุ่ม</h2>
+                                    <p className="text-[12px] text-[#676879]">เปรียบเทียบความจุกับชั่วโมงงานที่ได้รับ</p>
                                 </div>
                                 <div className="text-[12px] text-[#676879] flex items-center gap-3">
-                                    <span>{metrics.teamOnlyMembers.length} team</span>
-                                    <span>{metrics.crewOnlyMembers.length} crew</span>
+                                    <span>{metrics.teamOnlyMembers.length} ทีมงาน</span>
+                                    <span>{metrics.crewOnlyMembers.length} ทีมช่าง</span>
                                 </div>
                             </div>
 
@@ -258,7 +258,7 @@ export default function DashboardOverviewView({ tasks, teamMembers }: DashboardO
                         <div className="space-y-4">
                             <div className="bg-white rounded-xl border border-[#d0d4e4] p-4">
                                 <div className="flex items-center gap-2 text-[14px] font-bold text-[#323338]">
-                                    <AlertTriangle className="w-4 h-4 text-[#e2445c]" /> Critical
+                                    <AlertTriangle className="w-4 h-4 text-[#e2445c]" /> ต้องเร่งติดตาม
                                 </div>
                                 <div className="mt-3 space-y-2">
                                     {metrics.overdueTasks.slice(0, 5).map((task) => (
@@ -268,18 +268,18 @@ export default function DashboardOverviewView({ tasks, teamMembers }: DashboardO
                                             className="block p-2.5 rounded-lg bg-[#fff5f6] border border-[#ffd9de] hover:bg-[#ffecef] transition-colors"
                                         >
                                             <div className="text-[12px] font-semibold text-[#323338] truncate">{task.name}</div>
-                                            <div className="text-[11px] text-[#e2445c] mt-1">Due: {task.planEndDate}</div>
+                                            <div className="text-[11px] text-[#e2445c] mt-1">ครบกำหนด: {task.planEndDate}</div>
                                         </Link>
                                     ))}
                                     {metrics.overdueTasks.length === 0 && (
-                                        <div className="text-[12px] text-[#676879]">No overdue tasks.</div>
+                                        <div className="text-[12px] text-[#676879]">ไม่มีงานเกินกำหนด</div>
                                     )}
                                 </div>
                             </div>
 
                             <div className="bg-white rounded-xl border border-[#d0d4e4] p-4">
                                 <div className="flex items-center gap-2 text-[14px] font-bold text-[#323338]">
-                                    <Clock3 className="w-4 h-4 text-[#fdab3d]" /> Due Soon
+                                    <Clock3 className="w-4 h-4 text-[#fdab3d]" /> ใกล้ครบกำหนด
                                 </div>
                                 <div className="mt-3 space-y-2">
                                     {metrics.dueSoonTasks.slice(0, 5).map((task) => (
@@ -289,30 +289,30 @@ export default function DashboardOverviewView({ tasks, teamMembers }: DashboardO
                                             className="block p-2.5 rounded-lg bg-[#fff8ee] border border-[#ffe0b2] hover:bg-[#fff2dd] transition-colors"
                                         >
                                             <div className="text-[12px] font-semibold text-[#323338] truncate">{task.name}</div>
-                                            <div className="text-[11px] text-[#fdab3d] mt-1">Due: {task.planEndDate}</div>
+                                            <div className="text-[11px] text-[#fdab3d] mt-1">ครบกำหนด: {task.planEndDate}</div>
                                         </Link>
                                     ))}
                                     {metrics.dueSoonTasks.length === 0 && (
-                                        <div className="text-[12px] text-[#676879]">No tasks due in 48 hours.</div>
+                                        <div className="text-[12px] text-[#676879]">ไม่มีงานที่ครบกำหนดภายใน 48 ชั่วโมง</div>
                                     )}
                                 </div>
                             </div>
 
                             <div className="bg-white rounded-xl border border-[#d0d4e4] p-4">
                                 <div className="flex items-center gap-2 text-[14px] font-bold text-[#323338]">
-                                    <UserX2 className="w-4 h-4 text-[#579bfc]" /> Unassigned
+                                    <UserX2 className="w-4 h-4 text-[#579bfc]" /> ยังไม่มอบหมาย
                                 </div>
-                                <div className="mt-3 text-[12px] text-[#676879]">{metrics.unassignedTasks.length} tasks still need owners.</div>
+                                <div className="mt-3 text-[12px] text-[#676879]">มี {metrics.unassignedTasks.length} งานที่ยังไม่ได้กำหนดผู้รับผิดชอบ</div>
                             </div>
 
                             <div className="bg-white rounded-xl border border-[#d0d4e4] p-4">
                                 <div className="flex items-center gap-2 text-[14px] font-bold text-[#323338]">
-                                    <UsersRound className="w-4 h-4 text-[#323338]" /> Capacity Alert
+                                    <UsersRound className="w-4 h-4 text-[#323338]" /> แจ้งเตือนภาระงาน
                                 </div>
                                 <div className="mt-3 text-[12px] text-[#676879]">
                                     {metrics.overloadedMembers.length > 0
-                                        ? `${metrics.overloadedMembers.length} members are over 100% capacity.`
-                                        : 'All members are within capacity.'}
+                                        ? `มี ${metrics.overloadedMembers.length} คนที่ใช้ความจุเกิน 100%`
+                                        : 'สมาชิกทุกคนยังอยู่ในความจุที่รองรับได้'}
                                 </div>
                             </div>
                         </div>

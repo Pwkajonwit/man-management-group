@@ -48,15 +48,17 @@ export default function SidebarNavigation({ mobile = false, onNavigate }: Sideba
     const [newWorkspaceName, setNewWorkspaceName] = useState('');
     const [newWorkspaceCode, setNewWorkspaceCode] = useState('');
     const [creatingWorkspace, setCreatingWorkspace] = useState(false);
+    const [collapseScope, setCollapseScope] = useState(true);
     const [collapseWorkspaces, setCollapseWorkspaces] = useState(false);
     const [hideCompletedWorkspaces, setHideCompletedWorkspaces] = useState(true);
 
     const navItems = [
-        { href: '/dashboard', label: 'Dashboard', icon: BarChart3, match: '/dashboard' },
-        { href: '/my-work', label: 'My Work Tracker', icon: MessageSquare, match: '/my-work' },
-        { href: '/users', label: 'Users Management', icon: Users, match: '/users' },
-        { href: '/settings', label: 'Settings', icon: Settings2, match: '/settings' },
-        { href: '/settings/scope', label: 'Branch/Department', icon: GitBranch, match: '/settings/scope', includeChildren: true },
+        { href: '/dashboard', label: 'แดชบอร์ด', icon: BarChart3, match: '/dashboard' },
+        { href: '/my-work', label: 'งานของฉัน', icon: MessageSquare, match: '/my-work' },
+        { href: '/users', label: 'จัดการผู้ใช้', icon: Users, match: '/users' },
+        { href: '/settings/scope', label: 'สาขา/แผนก', icon: GitBranch, match: '/settings/scope', includeChildren: true },
+        { href: '/settings', label: 'ตั้งค่า', icon: Settings2, match: '/settings' },
+
     ];
 
     const handleCreateWorkspace = async () => {
@@ -74,7 +76,7 @@ export default function SidebarNavigation({ mobile = false, onNavigate }: Sideba
             onNavigate?.();
         } catch (error) {
             console.error('Failed to create workspace:', error);
-            alert('Cannot create workspace. Please try again.');
+            alert('ไม่สามารถสร้างโครงการได้ กรุณาลองใหม่อีกครั้ง');
         } finally {
             setCreatingWorkspace(false);
         }
@@ -107,53 +109,63 @@ export default function SidebarNavigation({ mobile = false, onNavigate }: Sideba
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_12%,rgba(112,170,224,0.22),transparent_34%),radial-gradient(circle_at_84%_4%,rgba(130,198,226,0.16),transparent_38%)]" />
 
             <div className="relative z-10 px-5 pt-5 pb-4 border-b border-white/12">
-                <div className="flex items-center gap-3">
-                    <div className="min-w-0">
-                        <p className="text-[17px] font-bold tracking-tight text-white truncate">Powertec</p>
-                        <p className="text-[10px] uppercase tracking-[0.14em] text-[#9cb3c8]">Task Management</p>
+                    <div className="flex items-center gap-3">
+                        <div className="min-w-0">
+                            <p className="text-[17px] font-bold tracking-tight text-white truncate">Powertec</p>
+                            <p className="text-[10px] tracking-[0.14em] text-[#9cb3c8]">ระบบจัดการงาน</p>
+                        </div>
                     </div>
-                </div>
             </div>
 
-            <div className="relative z-10 flex-1 overflow-y-auto overflow-x-hidden py-4">
+            <div className="scrollbar-dark relative z-10 flex-1 overflow-y-auto overflow-x-hidden py-4">
                 {canSelectScope && (
                     <div className="mx-4 mb-5 rounded-2xl border border-white/12 bg-[#10273c]/75 backdrop-blur-sm p-3.5 overflow-hidden">
-                        <p className="text-[12px] uppercase tracking-[0.12em] font-semibold text-[#9eb4ca] mb-2">Scope</p>
-                        <div className="space-y-2">
-                            <div>
-                                <label className="block text-[10px] uppercase tracking-[0.12em] text-[#87a0b7] mb-1">Branch</label>
-                                <select
-                                    value={scopeBranchId}
-                                    onChange={(e) => setScopeBranchId(e.target.value)}
-                                    className="w-full text-[12px] px-2.5 py-2 rounded-lg border border-[#385773] bg-[#091a2a] text-[#e7eef7] outline-none focus:ring-1 focus:ring-[#57a2eb] focus:border-[#57a2eb]"
-                                >
-                                    {scopeBranchOptions.map((option) => (
-                                        <option key={option.id} value={option.id}>
-                                            {option.label}
-                                        </option>
-                                    ))}
-                                </select>
+                        <button
+                            type="button"
+                            onClick={() => setCollapseScope((prev) => !prev)}
+                            className="flex w-full items-center justify-between gap-3 text-left"
+                            aria-expanded={!collapseScope}
+                        >
+                            <p className="text-[12px] tracking-[0.12em] font-semibold text-[#9eb4ca]">ขอบเขตการแสดงผล</p>
+                            <ChevronDown className={`h-4 w-4 text-[#9eb4ca] transition-transform ${collapseScope ? '-rotate-90' : ''}`} />
+                        </button>
+                        {!collapseScope && (
+                            <div className="space-y-2 pt-3">
+                                <div>
+                                    <label className="block text-[10px] tracking-[0.12em] text-[#87a0b7] mb-1">สาขา</label>
+                                    <select
+                                        value={scopeBranchId}
+                                        onChange={(e) => setScopeBranchId(e.target.value)}
+                                        className="w-full text-[12px] px-2.5 py-2 rounded-lg border border-[#385773] bg-[#091a2a] text-[#e7eef7] outline-none focus:ring-1 focus:ring-[#57a2eb] focus:border-[#57a2eb]"
+                                    >
+                                        {scopeBranchOptions.map((option) => (
+                                            <option key={option.id} value={option.id}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] tracking-[0.12em] text-[#87a0b7] mb-1">แผนก</label>
+                                    <select
+                                        value={scopeDepartmentId}
+                                        onChange={(e) => setScopeDepartmentId(e.target.value)}
+                                        className="w-full text-[12px] px-2.5 py-2 rounded-lg border border-[#385773] bg-[#091a2a] text-[#e7eef7] outline-none focus:ring-1 focus:ring-[#57a2eb] focus:border-[#57a2eb]"
+                                    >
+                                        {scopeDepartmentOptions.map((option) => (
+                                            <option key={option.id} value={option.id}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-[10px] uppercase tracking-[0.12em] text-[#87a0b7] mb-1">Department</label>
-                                <select
-                                    value={scopeDepartmentId}
-                                    onChange={(e) => setScopeDepartmentId(e.target.value)}
-                                    className="w-full text-[12px] px-2.5 py-2 rounded-lg border border-[#385773] bg-[#091a2a] text-[#e7eef7] outline-none focus:ring-1 focus:ring-[#57a2eb] focus:border-[#57a2eb]"
-                                >
-                                    {scopeDepartmentOptions.map((option) => (
-                                        <option key={option.id} value={option.id}>
-                                            {option.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
+                        )}
                     </div>
                 )}
 
                 <div className="px-4 mb-5">
-                    <p className="text-[10px] uppercase tracking-[0.16em] font-semibold text-[#97acc2] px-2 mb-1.5">Navigation</p>
+                    <p className="text-[10px] tracking-[0.16em] font-semibold text-[#97acc2] px-2 mb-1.5">เมนูหลัก</p>
                     {navItems.map((item) => {
                         const isActive = item.match
                             ? pathname === item.match
@@ -181,12 +193,12 @@ export default function SidebarNavigation({ mobile = false, onNavigate }: Sideba
 
                 <div className="mx-4 mt-6 rounded-2xl border border-white/12 bg-[#10273c]/75 backdrop-blur-sm p-3.5 overflow-hidden">
                     <div className="flex items-center justify-between mb-2.5">
-                        <p className="text-[12px] uppercase tracking-[0.12em] font-semibold text-[#9eb4ca]">Workspaces</p>
+                        <p className="text-[12px] tracking-[0.12em] font-semibold text-[#9eb4ca]">โครงการ</p>
                         <div className="flex items-center gap-1">
                             <button
                                 onClick={() => setHideCompletedWorkspaces((prev) => !prev)}
                                 className="p-1.5 rounded-lg text-[#b8cce0] hover:bg-white/10 hover:text-white transition-colors"
-                                title={hideCompletedWorkspaces ? 'Hidden mode is on (click to show all)' : 'Showing all workspaces (click to hide completed)'}
+                                title={hideCompletedWorkspaces ? 'ซ่อนโครงการที่เสร็จแล้วอยู่ กดเพื่อแสดงทั้งหมด' : 'กำลังแสดงทั้งหมด กดเพื่อซ่อนโครงการที่เสร็จแล้ว'}
                             >
                                 {hideCompletedWorkspaces ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                             </button>
@@ -196,24 +208,24 @@ export default function SidebarNavigation({ mobile = false, onNavigate }: Sideba
                                     setShowCreateWorkspace((prev) => !prev);
                                 }}
                                 className="p-1.5 rounded-lg text-[#b8cce0] hover:bg-white/10 hover:text-white transition-colors"
-                                title="Create Workspace"
+                                title="สร้างโครงการ"
                             >
                                 <Plus className="w-4 h-4" />
                             </button>
                             <button
                                 onClick={() => setCollapseWorkspaces((prev) => !prev)}
                                 className="p-1.5 rounded-lg text-[#b8cce0] hover:bg-white/10 hover:text-white transition-colors"
-                                title={collapseWorkspaces ? 'Expand workspaces' : 'Collapse workspaces'}
+                                title={collapseWorkspaces ? 'ขยายรายการโครงการ' : 'ย่อรายการโครงการ'}
                             >
                                 <ChevronDown className={`w-4 h-4 transition-transform ${collapseWorkspaces ? '-rotate-90' : ''}`} />
                             </button>
                         </div>
                     </div>
                     <p className="text-[11px] text-[#87a0b7] mb-2.5">
-                        {visibleProjects.length} visible
+                        แสดงอยู่ {visibleProjects.length} รายการ
                         {hideCompletedWorkspaces
-                            ? ` | ${hiddenByStatusCount} completed hidden`
-                            : ` | ${projects.length} total`}
+                            ? ` | ซ่อนที่เสร็จแล้ว ${hiddenByStatusCount} รายการ`
+                            : ` | ทั้งหมด ${projects.length} รายการ`}
                     </p>
 
                     {!collapseWorkspaces && showCreateWorkspace && (
@@ -230,7 +242,7 @@ export default function SidebarNavigation({ mobile = false, onNavigate }: Sideba
                                         setNewWorkspaceCode('');
                                     }
                                 }}
-                                placeholder="Workspace name..."
+                                placeholder="ชื่อโครงการ..."
                                 className="w-full text-[13px] px-2.5 py-2 rounded-lg border border-[#385773] bg-[#091a2a] text-[#e7eef7] placeholder:text-[#7893ab] outline-none focus:ring-1 focus:ring-[#57a2eb] focus:border-[#57a2eb]"
                                 autoFocus
                             />
@@ -238,7 +250,7 @@ export default function SidebarNavigation({ mobile = false, onNavigate }: Sideba
                                 type="text"
                                 value={newWorkspaceCode}
                                 onChange={(e) => setNewWorkspaceCode(e.target.value)}
-                                placeholder="Project No. (e.g. PJ-001)"
+                                placeholder="เลขที่โครงการ (เช่น PJ-001)"
                                 className="w-full mt-2 text-[13px] px-2.5 py-2 rounded-lg border border-[#385773] bg-[#091a2a] text-[#e7eef7] placeholder:text-[#7893ab] outline-none focus:ring-1 focus:ring-[#57a2eb] focus:border-[#57a2eb]"
                             />
                             <div className="flex items-center justify-end gap-1 mt-2">
@@ -249,7 +261,7 @@ export default function SidebarNavigation({ mobile = false, onNavigate }: Sideba
                                         setNewWorkspaceCode('');
                                     }}
                                     className="p-1.5 rounded-md text-[#afc4d7] hover:bg-white/10"
-                                    title="Cancel"
+                                    title="ยกเลิก"
                                 >
                                     <X className="w-3.5 h-3.5" />
                                 </button>
@@ -257,7 +269,7 @@ export default function SidebarNavigation({ mobile = false, onNavigate }: Sideba
                                     onClick={() => void handleCreateWorkspace()}
                                     disabled={!newWorkspaceName.trim() || creatingWorkspace}
                                     className="p-1.5 rounded-md text-white bg-[#2375cb] hover:bg-[#1f66ae] disabled:bg-[#4b5e72]"
-                                    title="Create"
+                                    title="สร้าง"
                                 >
                                     <Check className="w-3.5 h-3.5" />
                                 </button>
@@ -296,7 +308,7 @@ export default function SidebarNavigation({ mobile = false, onNavigate }: Sideba
                             })}
                             {visibleProjects.length === 0 && (
                                 <div className="rounded-lg border border-dashed border-[#3b5772] bg-[#0d1e2e] px-3 py-2 text-[11px] text-[#8fa6bc]">
-                                    No visible workspaces
+                                    ไม่มีโครงการที่แสดงอยู่
                                 </div>
                             )}
                         </div>
@@ -320,12 +332,12 @@ export default function SidebarNavigation({ mobile = false, onNavigate }: Sideba
                     )}
                     <div className="min-w-0 flex-1">
                         <div className="text-[13px] font-medium text-[#e6eef7] truncate">{user?.displayName}</div>
-                        <div className="text-[10px] uppercase tracking-[0.08em] text-[#95abc1]">Authenticated User</div>
+                        <div className="text-[10px] tracking-[0.08em] text-[#95abc1]">ผู้ใช้ที่เข้าสู่ระบบ</div>
                     </div>
                     <button
                         onClick={logoutUser}
                         className="p-1.5 text-[#afc4d7] hover:text-[#ffd5dc] hover:bg-[#5a2435]/80 rounded-lg transition-colors"
-                        title="Logout"
+                        title="ออกจากระบบ"
                     >
                         <LogOut className="w-4 h-4" />
                     </button>

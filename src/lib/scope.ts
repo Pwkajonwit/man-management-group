@@ -5,6 +5,14 @@ export const DEFAULT_BRANCH_ID = 'branch-hq';
 export const DEFAULT_DEPARTMENT_ID = 'dept-general';
 export const DEFAULT_SYSTEM_USER_ROLE: SystemUserRole = 'staff';
 
+export function isLegacyDefaultBranchId(value?: string | null): boolean {
+    return String(value || '').trim() === DEFAULT_BRANCH_ID;
+}
+
+export function isLegacyDefaultDepartmentId(value?: string | null): boolean {
+    return String(value || '').trim() === DEFAULT_DEPARTMENT_ID;
+}
+
 export interface ScopeFields {
     orgId?: string;
     branchId?: string;

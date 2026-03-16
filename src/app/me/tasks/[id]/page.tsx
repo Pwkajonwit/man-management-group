@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { addDays, isPast } from 'date-fns';
 import {
     AlertTriangle, ArrowLeft, CalendarDays, CheckCircle2, Clock3,
@@ -11,7 +11,7 @@ import {
 import LinearLoadingScreen from '@/components/LinearLoadingScreen';
 import { useAppContext } from '@/contexts/AppContext';
 import { getStatusColor, getStatusLabel } from '@/utils/statusUtils';
-import { isTaskAssignedToCurrentUser } from '@/utils/taskOwnerUtils';
+import { findCurrentTeamMember, isTaskAssignedToCurrentUser } from '@/utils/taskOwnerUtils';
 import { Task } from '@/types/construction';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -67,6 +67,7 @@ function getStatusActionClass(buttonStatus: Task['status'], currentStatus: Task[
 
 export default function UserTaskDetailPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { user } = useAuth();
     const params = useParams<{ id: string }>();
     const taskId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -123,7 +124,22 @@ export default function UserTaskDetailPage() {
         );
     }
 
-    const isOwner = isTaskAssignedToCurrentUser(task, teamMembers, currentUserName, user?.lineUserId, user?.uid);
+    const impersonatedMemberId = searchParams.get('asMember') || '';
+    const currentMember = findCurrentTeamMember(teamMembers, currentUserName, user?.lineUserId, user?.uid);
+    const canImpersonate = Boolean(
+        user?.role && ['super_admin', 'branch_manager', 'department_manager'].includes(user.role)
+    );
+    const impersonatedMember = impersonatedMemberId && canImpersonate
+        ? (teamMembers.find((member) => member.id === impersonatedMemberId) || null)
+        : null;
+    const effectiveMember = impersonatedMember || currentMember;
+    const isOwner = isTaskAssignedToCurrentUser(
+        task,
+        teamMembers,
+        effectiveMember?.name || currentUserName,
+        impersonatedMember ? undefined : user?.lineUserId,
+        effectiveMember?.id || user?.uid
+    );
     if (!isOwner) {
         return (
             <div className="min-h-screen bg-[#f5f6f8] p-4 flex items-center justify-center">
@@ -500,4 +516,3 @@ export default function UserTaskDetailPage() {
         </div>
     );
 }
-

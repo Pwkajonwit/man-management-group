@@ -16,6 +16,8 @@ interface MobileMyTasksViewProps {
     projects: Project[];
     teamMembers: TeamMember[];
     currentUserName: string;
+    branchOptions: Array<{ id: string; label: string }>;
+    departmentOptions: Array<{ id: string; label: string; branchId?: string }>;
     onStatusChange: (taskId: string, newStatus: Task['status']) => void;
 }
 
@@ -88,6 +90,8 @@ export default function MobileMyTasksView({
     projects,
     teamMembers,
     currentUserName,
+    branchOptions,
+    departmentOptions,
     onStatusChange,
 }: MobileMyTasksViewProps) {
     const [activeTab, setActiveTab] = useState<FilterTab>('all');
@@ -104,9 +108,18 @@ export default function MobileMyTasksView({
         targetStatus: Task['status'];
     } | null>(null);
     const [isChangingStatus, setIsChangingStatus] = useState(false);
-    const { user } = useAuth();
+    const [impersonatedMemberId, setImpersonatedMemberId] = useState('');
+    const { user, logoutUser } = useAuth();
     const profileName = user?.displayName || currentUserName || 'User';
     const profileInitial = profileName.substring(0, 2).toUpperCase();
+    const branchLabelById = useMemo(
+        () => new Map(branchOptions.map((option) => [option.id, option.label])),
+        [branchOptions]
+    );
+    const departmentLabelById = useMemo(
+        () => new Map(departmentOptions.map((option) => [option.id, option.label])),
+        [departmentOptions]
+    );
     const registeredMemberName = useMemo(() => {
         const matchedMember = findCurrentTeamMember(
             teamMembers,
@@ -116,6 +129,46 @@ export default function MobileMyTasksView({
         );
         return matchedMember?.name || currentUserName || profileName || 'User';
     }, [teamMembers, currentUserName, profileName, user?.lineUserId, user?.uid]);
+    const currentMember = useMemo(() => (
+        findCurrentTeamMember(
+            teamMembers,
+            currentUserName || profileName,
+            user?.lineUserId,
+            user?.uid
+        )
+    ), [teamMembers, currentUserName, profileName, user?.lineUserId, user?.uid]);
+    const canImpersonate = Boolean(
+        user?.role && ['super_admin', 'branch_manager', 'department_manager'].includes(user.role)
+    );
+    const impersonationCandidates = useMemo(
+        () => teamMembers
+            .filter((member) => member.memberType !== 'crew')
+            .slice()
+            .sort((a, b) => a.name.localeCompare(b.name, 'th')),
+        [teamMembers]
+    );
+    const impersonatedMember = useMemo(() => {
+        if (!canImpersonate || !impersonatedMemberId) return null;
+        return impersonationCandidates.find((member) => member.id === impersonatedMemberId) || null;
+    }, [canImpersonate, impersonatedMemberId, impersonationCandidates]);
+    const effectiveMember = impersonatedMember || currentMember;
+    const effectiveMemberName = effectiveMember?.name || registeredMemberName;
+    const profileBranchLabel = useMemo(() => {
+        const branchId = currentMember?.branchId || user?.branchId || '';
+        return branchLabelById.get(branchId) || currentMember?.position || branchId || '-';
+    }, [branchLabelById, currentMember?.branchId, currentMember?.position, user?.branchId]);
+    const profileDepartmentLabel = useMemo(() => {
+        const departmentId = currentMember?.departmentId || user?.departmentId || '';
+        return departmentLabelById.get(departmentId) || currentMember?.department || departmentId || '-';
+    }, [currentMember?.department, currentMember?.departmentId, departmentLabelById, user?.departmentId]);
+    const effectiveBranchLabel = useMemo(() => {
+        const branchId = effectiveMember?.branchId || '';
+        return branchLabelById.get(branchId) || effectiveMember?.position || branchId || '-';
+    }, [branchLabelById, effectiveMember?.branchId, effectiveMember?.position]);
+    const effectiveDepartmentLabel = useMemo(() => {
+        const departmentId = effectiveMember?.departmentId || '';
+        return departmentLabelById.get(departmentId) || effectiveMember?.department || departmentId || '-';
+    }, [departmentLabelById, effectiveMember?.department, effectiveMember?.departmentId]);
 
     const completedProjectIds = useMemo(() => (
         new Set(
@@ -139,9 +192,15 @@ export default function MobileMyTasksView({
 
     const myTasks = useMemo(() => {
         return reportTasks.filter((task) =>
-            isTaskAssignedToCurrentUser(task, teamMembers, currentUserName, user?.lineUserId, user?.uid)
+            isTaskAssignedToCurrentUser(
+                task,
+                teamMembers,
+                impersonatedMember?.name || currentUserName,
+                impersonatedMember ? undefined : user?.lineUserId,
+                impersonatedMember?.id || user?.uid
+            )
         );
-    }, [reportTasks, teamMembers, currentUserName, user?.lineUserId, user?.uid]);
+    }, [reportTasks, teamMembers, impersonatedMember, currentUserName, user?.lineUserId, user?.uid]);
 
     const taskOwnerNamesById = useMemo(() => {
         const map = new Map<string, string[]>();
@@ -205,7 +264,7 @@ export default function MobileMyTasksView({
                     <div>
                         <h1 className="text-[16px] font-bold text-white tracking-[0.02em]">POWERTEC ENGINEERING CO., LTD.</h1>
                         <p className="text-[12px] text-[#d8e7f6] flex items-center gap-1 mt-0.5">
-                            <UserRound className="w-3.5 h-3.5" /> {registeredMemberName}
+                            <UserRound className="w-3.5 h-3.5" /> {impersonatedMember ? `โหมดทดสอบ: ${effectiveMemberName}` : registeredMemberName}
                         </p>
                     </div>
                     <div className="relative">
@@ -228,9 +287,29 @@ export default function MobileMyTasksView({
                             )}
                         </button>
                         {showProfileCard && (
-                            <div className="absolute right-0 mt-2 min-w-[170px] rounded-lg border border-[#c9d4e2] bg-white shadow-[0_12px_28px_rgba(12,34,58,0.2)] px-3 py-2">
+                            <div className="absolute right-0 mt-2 min-w-[220px] rounded-xl border border-[#c9d4e2] bg-white shadow-[0_12px_28px_rgba(12,34,58,0.2)] px-3 py-3">
                                 <p className="text-[11px] text-[#6f7f92] uppercase tracking-wide">โปรไฟล์</p>
                                 <p className="text-[13px] font-semibold text-[#1e2f44] truncate mt-0.5">{registeredMemberName}</p>
+                                <div className="mt-3 space-y-2">
+                                    <div className="rounded-lg border border-[#d7e0ea] bg-[#f8fbff] px-2.5 py-2">
+                                        <p className="text-[10px] uppercase tracking-wide text-[#6c7f93]">สาขา</p>
+                                        <p className="text-[12px] font-semibold text-[#1f3147] mt-0.5">{profileBranchLabel}</p>
+                                    </div>
+                                    <div className="rounded-lg border border-[#d7e0ea] bg-[#f8fbff] px-2.5 py-2">
+                                        <p className="text-[10px] uppercase tracking-wide text-[#6c7f93]">แผนก</p>
+                                        <p className="text-[12px] font-semibold text-[#1f3147] mt-0.5">{profileDepartmentLabel}</p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowProfileCard(false);
+                                        logoutUser();
+                                    }}
+                                    className="mt-3 w-full rounded-lg border border-[#ffd4db] bg-[#fff4f6] px-3 py-2 text-[12px] font-semibold text-[#c33d57] transition-colors hover:bg-[#ffe8ed]"
+                                >
+                                    ออกจากระบบ
+                                </button>
                             </div>
                         )}
                     </div>
@@ -238,6 +317,42 @@ export default function MobileMyTasksView({
             </header>
 
             <main className="px-4 py-4 space-y-4 max-w-md mx-auto md:max-w-none md:mx-0 md:p-8">
+                {canImpersonate && (
+                    <div className="rounded-xl border border-[#cfd9e6] bg-white p-3 shadow-[0_2px_12px_rgba(30,56,86,0.06)]">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                            <div className="min-w-0">
+                                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6c7f93]">โหมดทดสอบแอดมิน</p>
+                                <p className="mt-1 text-[13px] text-[#24425f]">เลือกพนักงานเพื่อดูหน้า `/me` แทนคนนั้นสำหรับทดสอบการรับงาน</p>
+                            </div>
+                            <div className="w-full md:w-[320px]">
+                                <select
+                                    value={impersonatedMemberId}
+                                    onChange={(e) => setImpersonatedMemberId(e.target.value)}
+                                    className="w-full rounded-lg border border-[#cfd9e6] bg-[#f8fbff] px-3 py-2 text-[13px] text-[#1f3147] outline-none focus:border-[#2f5f90] focus:ring-2 focus:ring-[#2f5f90]/15"
+                                >
+                                    <option value="">ใช้ตัวตนปัจจุบัน</option>
+                                    {impersonationCandidates.map((member) => (
+                                        <option key={member.id} value={member.id}>
+                                            {member.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center rounded-full border border-[#d7e0ea] bg-[#f8fbff] px-2.5 py-1 text-[11px] font-semibold text-[#24425f]">
+                                กำลังดูงานของ: {effectiveMemberName}
+                            </span>
+                            <span className="inline-flex items-center rounded-full border border-[#d7e0ea] bg-[#f8fbff] px-2.5 py-1 text-[11px] font-semibold text-[#24425f]">
+                                สาขา: {effectiveBranchLabel}
+                            </span>
+                            <span className="inline-flex items-center rounded-full border border-[#d7e0ea] bg-[#f8fbff] px-2.5 py-1 text-[11px] font-semibold text-[#24425f]">
+                                แผนก: {effectiveDepartmentLabel}
+                            </span>
+                        </div>
+                    </div>
+                )}
+
                 <div className="grid grid-cols-4 gap-2">
                     <button
                         type="button"
@@ -394,7 +509,7 @@ export default function MobileMyTasksView({
                                         เสร็จสิ้น
                                     </button>
                                     <Link
-                                        href={`/me/tasks/${task.id}`}
+                                        href={impersonatedMemberId ? `/me/tasks/${task.id}?asMember=${encodeURIComponent(impersonatedMemberId)}` : `/me/tasks/${task.id}`}
                                         className="ml-auto text-[11px] px-2.5 py-1.5 rounded-md bg-[#f1f5fa] text-[#24425f] font-semibold border border-[#cfd8e5]"
                                     >
                                         รายละเอียด

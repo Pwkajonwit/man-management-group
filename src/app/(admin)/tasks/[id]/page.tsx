@@ -11,6 +11,12 @@ import {
 import { useAppContext } from '@/contexts/AppContext';
 import { Task } from '@/types/construction';
 import { getStatusColor, getStatusLabel } from '@/utils/statusUtils';
+import {
+    DEFAULT_BRANCH_ID,
+    DEFAULT_DEPARTMENT_ID,
+    isLegacyDefaultBranchId,
+    isLegacyDefaultDepartmentId,
+} from '@/lib/scope';
 
 const getPriorityColor = (p?: string) => {
     switch (p) {
@@ -51,6 +57,7 @@ const activityLabel = (action: string) => {
         case 'owner_changed': return 'changed owner';
         case 'priority_changed': return 'changed priority';
         case 'timeline_changed': return 'changed timeline';
+        case 'scope_changed': return 'changed scope';
         case 'subtask_added': return 'added subtask';
         case 'file_attached': return 'attached file';
         case 'file_removed': return 'removed file';
@@ -73,6 +80,7 @@ export default function TaskDetailPage() {
         handleUpdateTaskStatus, handleUpdateTaskPriority,
         handleUpdateTaskOwners, handleUpdateTaskDescription,
         handleUpdateTaskProgress, handleUpdateTaskTimeline,
+        taskScopeBranchOptions, taskScopeDepartmentOptions,
     } = useAppContext();
 
     const task = tasks.find(t => t.id === taskId);
@@ -129,7 +137,20 @@ export default function TaskDetailPage() {
         endDate.setHours(23, 59, 59, 999);
         return !isPast(endDate) && endDate <= addDays(new Date(), 2);
     })();
-
+    const branchLabelById = new Map(taskScopeBranchOptions.map((option) => [option.id, option.label]));
+    const departmentLabelById = new Map(taskScopeDepartmentOptions.map((option) => [option.id, option.label]));
+    const currentBranchId = (() => {
+        const sourceBranchId = task.branchId || project?.branchId || DEFAULT_BRANCH_ID;
+        if (!isLegacyDefaultBranchId(sourceBranchId)) return sourceBranchId;
+        return taskScopeBranchOptions[0]?.id || sourceBranchId;
+    })();
+    const currentDepartmentId = (() => {
+        const sourceDepartmentId = task.departmentId || project?.departmentId || DEFAULT_DEPARTMENT_ID;
+        if (!isLegacyDefaultDepartmentId(sourceDepartmentId)) return sourceDepartmentId;
+        return taskScopeDepartmentOptions.find((option) => !option.branchId || option.branchId === currentBranchId)?.id
+            || taskScopeDepartmentOptions[0]?.id
+            || sourceDepartmentId;
+    })();
     const handleAddSubTask = () => {
         if (newSubtaskName.trim()) {
             addSubTask(taskId, newSubtaskName);
@@ -201,7 +222,7 @@ export default function TaskDetailPage() {
                         <>
                             <div className="bg-white rounded-xl border border-[#d0d4e4] p-4">
                                 <div className="flex items-start justify-between gap-4 flex-wrap">
-                                    <div>
+                                    <div className="min-w-0 flex-1">
                                         <div className="text-[11px] text-[#676879] uppercase tracking-wider font-semibold">สรุปอย่างย่อ</div>
                                         <div className="mt-1 text-[14px] font-semibold text-[#323338]">{task.name}</div>
                                         <div className="mt-2 flex items-center gap-2 flex-wrap">
@@ -213,9 +234,17 @@ export default function TaskDetailPage() {
                                                 <span className="inline-flex items-center px-2 py-1 rounded-full bg-[#f0f1f4] text-[#676879] text-[11px] font-semibold">ยังไม่ระบุ</span>
                                             )}
                                         </div>
+                                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                                            <span className="inline-flex items-center rounded-full border border-[#d8e3f0] bg-[#f8fbff] px-2.5 py-1 text-[11px] font-semibold text-[#33495f]">
+                                                สาขา: {branchLabelById.get(currentBranchId) || currentBranchId}
+                                            </span>
+                                            <span className="inline-flex items-center rounded-full border border-[#d8e3f0] bg-[#f8fbff] px-2.5 py-1 text-[11px] font-semibold text-[#33495f]">
+                                                แผนก: {departmentLabelById.get(currentDepartmentId) || currentDepartmentId}
+                                            </span>
+                                        </div>
                                     </div>
 
-                                    <div className="text-right">
+                                    <div className="min-w-[180px] rounded-xl border border-[#e6e9ef] bg-[#f8fafc] px-3 py-2 text-right">
                                         <div className={`text-[12px] font-bold ${taskOverdue ? 'text-[#e2445c]' : taskDueSoon ? 'text-[#fdab3d]' : 'text-[#00a66a]'}`}>
                                             {taskOverdue ? 'เกินกำหนด' : taskDueSoon ? 'ใกล้กำหนด' : 'ตามแผน'}
                                         </div>
@@ -231,7 +260,7 @@ export default function TaskDetailPage() {
                             </div>
 
                             {/* Quick Info Cards */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                                 {/* Owner */}
                                 <div className="bg-white rounded-xl border border-[#d0d4e4] p-4">
                                     <div className="text-[11px] text-[#676879] uppercase font-bold tracking-wider mb-2">ผู้รับผิดชอบ</div>

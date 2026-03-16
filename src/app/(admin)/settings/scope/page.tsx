@@ -6,7 +6,6 @@ import LinearLoadingScreen from '@/components/LinearLoadingScreen';
 import { useAppContext } from '@/contexts/AppContext';
 import { useConfirmModal } from '@/contexts/ConfirmModalContext';
 import { subscribeScopeCatalog, upsertScopeCatalog } from '@/lib/firestore';
-import { DEFAULT_BRANCH_ID, DEFAULT_DEPARTMENT_ID } from '@/lib/scope';
 import { ScopeBranch, ScopeDepartment } from '@/types/construction';
 
 function normalizeId(value: string): string {
@@ -34,8 +33,8 @@ export default function ScopeSettingsPage() {
 
     useEffect(() => {
         if (dataSource !== 'firebase') {
-            setBranches([{ id: DEFAULT_BRANCH_ID, label: 'สำนักงานใหญ่' }]);
-            setDepartments([{ id: DEFAULT_DEPARTMENT_ID, label: 'ทั่วไป', branchId: DEFAULT_BRANCH_ID }]);
+            setBranches([]);
+            setDepartments([]);
             setIsCatalogLoading(false);
             return;
         }
