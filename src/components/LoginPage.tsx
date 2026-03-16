@@ -48,7 +48,7 @@ export default function LoginPage({
         const password = credentialPassword;
 
         if (!user || !password) {
-            setAuthError('Please enter User/Email and Password.');
+            setAuthError('กรุณากรอกชื่อผู้ใช้/อีเมล และรหัสผ่าน');
             return;
         }
 
@@ -62,7 +62,7 @@ export default function LoginPage({
                 await registerWithPassword(user, password, credentialDisplayName.trim() || user);
             }
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Authentication failed.';
+            const message = error instanceof Error ? error.message : 'เข้าสู่ระบบไม่สำเร็จ';
             setAuthError(message);
         } finally {
             setAuthSubmitting(false);
@@ -72,7 +72,7 @@ export default function LoginPage({
     const handleLinePhoneBinding = async () => {
         const phone = linePhone.trim();
         if (!phone) {
-            setLineBindingError('Please enter your phone number.');
+            setLineBindingError('กรุณากรอกเบอร์โทร');
             return;
         }
 
@@ -81,7 +81,7 @@ export default function LoginPage({
             setLineBindingError('');
             await bindLinePhone(phone);
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Phone binding failed.';
+            const message = error instanceof Error ? error.message : 'ผูกเบอร์โทรไม่สำเร็จ';
             setLineBindingError(message);
         } finally {
             setLineBindingSubmitting(false);
@@ -95,31 +95,31 @@ export default function LoginPage({
                     <header className="px-7 py-6 bg-[#0f2740] border-b border-[#0a1d31]">
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-[#dce7f5] text-[11px] font-semibold tracking-wide uppercase">
                             <ShieldCheck className="w-3.5 h-3.5" />
-                            Secure Access
+                            เข้าถึงอย่างปลอดภัย
                         </div>
-                        <h1 className="mt-3 text-[24px] leading-tight font-bold text-white">WorkOS Access Portal</h1>
+                        <h1 className="mt-3 text-[24px] leading-tight font-bold text-white">เข้าสู่ระบบจัดการงาน</h1>
                         <p className="mt-1 text-[12px] text-[#c6d5e8]">
-                            Official sign-in for the Task Management System
+                            สำหรับผู้ดูแลระบบและพนักงานของระบบจัดการงาน
                         </p>
                     </header>
 
                     <main className="px-7 py-6 space-y-3">
                         {allowLineAuth && (
                             <div className="rounded-xl border border-[#d6e2ef] bg-[#f6f9fd] p-3 space-y-2">
-                                <p className="text-[12px] font-semibold text-[#1d2936]">LINE Access</p>
+                                <p className="text-[12px] font-semibold text-[#1d2936]">เข้าใช้งานด้วย LINE</p>
 
                                 {requiresLinePhoneBinding ? (
                                     <>
                                         <p className="text-[12px] text-[#4f5b68]">
-                                            LINE account <span className="font-semibold">{pendingLineProfile?.displayName || '-'}</span> is not linked yet.
-                                            Enter phone number to bind with system user.
+                                            บัญชี LINE <span className="font-semibold">{pendingLineProfile?.displayName || '-'}</span> ยังไม่ได้ผูกกับระบบ
+                                            กรุณากรอกเบอร์โทรเพื่อเชื่อมกับผู้ใช้ในระบบ
                                         </p>
                                         <input
                                             type="text"
                                             value={linePhone}
                                             onChange={e => setLinePhone(e.target.value)}
                                             onKeyDown={e => e.key === 'Enter' && !lineBindingSubmitting && handleLinePhoneBinding()}
-                                            placeholder="Phone number"
+                                            placeholder="เบอร์โทร"
                                             className="w-full h-11 px-4 border border-[#ccd5e1] rounded-xl text-[14px] outline-none focus:ring-2 focus:ring-[#0b63ce]/25 focus:border-[#0b63ce]"
                                         />
                                         {lineBindingError && <p className="text-[12px] text-[#c6314a]">{lineBindingError}</p>}
@@ -131,14 +131,14 @@ export default function LoginPage({
                                                 className="h-10 px-4 inline-flex items-center justify-center gap-2 bg-[#0b63ce] hover:bg-[#0a56b4] text-white font-semibold rounded-lg text-[13px] disabled:bg-[#a0a2b1] disabled:cursor-not-allowed"
                                             >
                                                 {lineBindingSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                                                {lineBindingSubmitting ? 'Binding...' : 'Bind Phone'}
+                                                {lineBindingSubmitting ? 'กำลังผูกบัญชี...' : 'ผูกเบอร์โทร'}
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={loginLine}
                                                 className="h-10 px-4 inline-flex items-center justify-center rounded-lg border border-[#c5d3e2] bg-white text-[#1f2f40] text-[13px] font-semibold hover:bg-[#eef3f8]"
                                             >
-                                                Change LINE
+                                                เปลี่ยนบัญชี LINE
                                             </button>
                                         </div>
                                     </>
@@ -148,7 +148,7 @@ export default function LoginPage({
                                         onClick={loginLine}
                                         className="w-full h-11 inline-flex items-center justify-center rounded-xl border border-[#0b63ce] bg-[#eaf2fd] text-[#0b63ce] text-[14px] font-semibold hover:bg-[#dfeaf9]"
                                     >
-                                        {lineOnly ? 'Continue with LINE' : 'Sign In with LINE'}
+                                        {lineOnly ? 'ดำเนินการต่อด้วย LINE' : 'เข้าสู่ระบบด้วย LINE'}
                                     </button>
                                 )}
                             </div>
@@ -158,7 +158,7 @@ export default function LoginPage({
                             <>
                                 <div className="flex items-center justify-between">
                                     <p className="text-[13px] font-semibold text-[#1d2936]">
-                                        {authMode === 'login' ? 'Sign in with User / Password' : 'Create User / Password'}
+                                        {authMode === 'login' ? 'เข้าสู่ระบบด้วยชื่อผู้ใช้ / รหัสผ่าน' : 'สร้างผู้ใช้ด้วยชื่อผู้ใช้ / รหัสผ่าน'}
                                     </p>
                                     <button
                                         type="button"
@@ -168,7 +168,7 @@ export default function LoginPage({
                                         }}
                                         className="text-[12px] text-[#0b63ce] font-semibold hover:underline"
                                     >
-                                        {authMode === 'login' ? 'Create account' : 'Back to login'}
+                                        {authMode === 'login' ? 'สร้างบัญชี' : 'กลับไปหน้าเข้าสู่ระบบ'}
                                     </button>
                                 </div>
 
@@ -177,7 +177,7 @@ export default function LoginPage({
                                         type="text"
                                         value={credentialDisplayName}
                                         onChange={e => setCredentialDisplayName(e.target.value)}
-                                        placeholder="Display name"
+                                        placeholder="ชื่อที่แสดง"
                                         className="w-full h-11 px-4 border border-[#ccd5e1] rounded-xl text-[14px] outline-none focus:ring-2 focus:ring-[#0b63ce]/25 focus:border-[#0b63ce]"
                                     />
                                 )}
@@ -187,7 +187,7 @@ export default function LoginPage({
                                     value={credentialUser}
                                     onChange={e => setCredentialUser(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && !authSubmitting && handleCredentialSubmit()}
-                                    placeholder="User or email (e.g. admin)"
+                                    placeholder="ชื่อผู้ใช้หรืออีเมล เช่น admin"
                                     className="w-full h-11 px-4 border border-[#ccd5e1] rounded-xl text-[14px] outline-none focus:ring-2 focus:ring-[#0b63ce]/25 focus:border-[#0b63ce]"
                                 />
                                 <input
@@ -195,7 +195,7 @@ export default function LoginPage({
                                     value={credentialPassword}
                                     onChange={e => setCredentialPassword(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && !authSubmitting && handleCredentialSubmit()}
-                                    placeholder="Password"
+                                    placeholder="รหัสผ่าน"
                                     className="w-full h-11 px-4 border border-[#ccd5e1] rounded-xl text-[14px] outline-none focus:ring-2 focus:ring-[#0b63ce]/25 focus:border-[#0b63ce]"
                                 />
 
@@ -208,7 +208,7 @@ export default function LoginPage({
                                     className="w-full h-11 inline-flex items-center justify-center gap-2 bg-[#0b63ce] hover:bg-[#0a56b4] text-white font-semibold rounded-xl text-[14px] disabled:bg-[#a0a2b1] disabled:cursor-not-allowed"
                                 >
                                     {authSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                                    {authMode === 'login' ? 'Sign In' : 'Create Account'}
+                                    {authMode === 'login' ? 'เข้าสู่ระบบ' : 'สร้างบัญชี'}
                                 </button>
                             </>
                         )}
@@ -216,14 +216,14 @@ export default function LoginPage({
                         <div className="rounded-lg bg-[#f5f8fc] border border-[#dde5ef] px-3 py-2">
                             {!lineOnly && (
                                 <p className="text-[11px] text-[#4f5b68]">
-                                    Tip: username only will be stored as <code className="font-mono">username@workos.local</code>
+                                    หมายเหตุ : การเข้าสู่ระบบด้วยชื่อผู้ใช้/รหัสผ่าน จะต้องมีบัญชีที่ถูกสร้างไว้ล่วงหน้าในระบบโดยผู้ดูแลระบบเท่านั้น ไม่สามารถสมัครได้ด้วยตนเองผ่านหน้านี้
                                 </p>
                             )}
                             {allowLineAuth && (
                                 <p className="mt-1 text-[11px] text-[#6b7785]">
                                     {lineOnly
-                                        ? 'This page uses LINE login only. If first login, please bind with your phone number in system.'
-                                        : 'LINE login and phone binding are available on this page.'}
+                                        ? 'หน้านี้ใช้การเข้าสู่ระบบด้วย LINE เท่านั้น หากเป็นการเข้าใช้งานครั้งแรก กรุณาผูกบัญชีด้วยเบอร์โทรที่อยู่ในระบบ'
+                                        : 'หน้านี้รองรับทั้งการเข้าสู่ระบบด้วย LINE และการผูกเบอร์โทร'}
                                 </p>
                             )}
                         </div>
