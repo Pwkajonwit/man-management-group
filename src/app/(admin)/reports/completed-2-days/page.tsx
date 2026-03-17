@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Task } from '@/types/construction';
 import { useAppContext } from '@/contexts/AppContext';
 import { getTaskOwnerNames as resolveTaskOwnerNames } from '@/utils/taskOwnerUtils';
-import { getStatusLabel } from '@/utils/statusUtils';
+import { getPriorityLabel, getStatusLabel } from '@/utils/statusUtils';
 
 type ReportRow = {
   id: string;
@@ -49,15 +49,15 @@ const isTaskActiveOnDate = (task: Task, dateKey: string) => {
 const getPriorityMeta = (priority?: Task['priority']) => {
   switch (priority) {
     case 'urgent':
-      return { label: 'ด่วนมาก', className: 'bg-[#fff1f2] border-[#fecdd3] text-[#9f1239]' };
+      return { label: getPriorityLabel(priority), className: 'bg-[#fff1f2] border-[#fecdd3] text-[#9f1239]' };
     case 'high':
-      return { label: 'สูง', className: 'bg-[#fff7ed] border-[#fed7aa] text-[#9a3412]' };
+      return { label: getPriorityLabel(priority), className: 'bg-[#fff7ed] border-[#fed7aa] text-[#9a3412]' };
     case 'medium':
-      return { label: 'ปานกลาง', className: 'bg-[#eef4ff] border-[#c9d8f5] text-[#1b4f92]' };
+      return { label: getPriorityLabel(priority), className: 'bg-[#eef4ff] border-[#c9d8f5] text-[#1b4f92]' };
     case 'low':
-      return { label: 'ต่ำ', className: 'bg-[#f8fafc] border-[#d6dde7] text-[#475569]' };
+      return { label: getPriorityLabel(priority), className: 'bg-[#f8fafc] border-[#d6dde7] text-[#475569]' };
     default:
-      return { label: '-', className: 'bg-[#f8fafc] border-[#d6dde7] text-[#64748b]' };
+      return { label: getPriorityLabel(priority), className: 'bg-[#f8fafc] border-[#d6dde7] text-[#64748b]' };
   }
 };
 

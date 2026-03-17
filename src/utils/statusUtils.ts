@@ -1,4 +1,4 @@
-import { Task } from '@/types/construction';
+import { Project, Task } from '@/types/construction';
 
 export const getStatusColor = (status: Task['status']) => {
     switch (status) {
@@ -12,10 +12,30 @@ export const getStatusColor = (status: Task['status']) => {
 
 export const getStatusLabel = (status: Task['status']) => {
     switch (status) {
-        case 'completed': return 'Done';
-        case 'in-progress': return 'Working on it';
-        case 'delayed': return 'Stuck';
+        case 'completed': return 'เสร็จสิ้น';
+        case 'in-progress': return 'กำลังดำเนินการ';
+        case 'delayed': return 'ติดขัด';
         case 'not-started':
-        default: return 'Not Started';
+        default: return 'ยังไม่เริ่ม';
+    }
+};
+
+export const getPriorityLabel = (priority?: Task['priority'] | '') => {
+    switch (priority) {
+        case 'urgent': return 'ด่วนมาก';
+        case 'high': return 'สูง';
+        case 'medium': return 'ปานกลาง';
+        case 'low': return 'ต่ำ';
+        default: return 'ไม่ระบุ';
+    }
+};
+
+export const getProjectStatusLabel = (status: Project['status']) => {
+    switch (status) {
+        case 'planning': return 'วางแผน';
+        case 'in-progress': return 'ดำเนินการ';
+        case 'on-hold': return 'พักไว้';
+        case 'completed': return 'เสร็จสิ้น';
+        default: return status;
     }
 };

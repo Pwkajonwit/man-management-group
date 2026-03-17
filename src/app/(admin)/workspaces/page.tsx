@@ -14,7 +14,7 @@ import KanbanBoard from '@/components/KanbanBoard';
 import TaskCalendarView from '@/components/TaskCalendarView';
 import TaskUpdateDrawer from '@/components/TaskUpdateDrawer';
 import LinearLoadingScreen from '@/components/LinearLoadingScreen';
-import { getStatusColor, getStatusLabel } from '@/utils/statusUtils';
+import { getPriorityLabel, getProjectStatusLabel, getStatusColor, getStatusLabel } from '@/utils/statusUtils';
 import { useAppContext } from '@/contexts/AppContext';
 import { createTask as fbCreateTask } from '@/lib/firestore';
 import { useConfirmModal } from '@/contexts/ConfirmModalContext';
@@ -37,26 +37,6 @@ const getPriorityColor = (priority?: string) => {
     case 'medium': return 'bg-[#579bfc] text-white';
     case 'low': return 'bg-[#c4c4c4] text-white';
     default: return 'bg-[#e6e9ef] text-[#676879]';
-  }
-};
-
-const getPriorityLabel = (priority?: string) => {
-  switch (priority) {
-    case 'urgent': return 'Urgent';
-    case 'high': return 'High';
-    case 'medium': return 'Medium';
-    case 'low': return 'Low';
-    default: return '-';
-  }
-};
-
-const getProjectStatusLabel = (status: Project['status']) => {
-  switch (status) {
-    case 'planning': return 'Planning';
-    case 'in-progress': return 'In Progress';
-    case 'on-hold': return 'On Hold';
-    case 'completed': return 'Completed';
-    default: return status;
   }
 };
 
@@ -1375,7 +1355,7 @@ export default function TaskBoardPage() {
                     <h3 className="font-medium text-[18px]" style={{ color }}>{category}</h3>
                     <span className="text-[13px] text-[#676879] font-normal ml-2">{categoryTasks.length} Tasks</span>
                     {hideCompletedTasks && hiddenDoneInCategory > 0 && (
-                      <span className="text-[12px] text-[#a0a2b1] font-normal">+{hiddenDoneInCategory} Done hidden</span>
+                      <span className="text-[12px] text-[#a0a2b1] font-normal">+{hiddenDoneInCategory} {'\u0E07\u0E32\u0E19\u0E40\u0E2A\u0E23\u0E47\u0E08\u0E17\u0E35\u0E48\u0E0B\u0E48\u0E2D\u0E19\u0E2D\u0E22\u0E39\u0E48'}</span>
                     )}
                   </div>
 
@@ -1599,7 +1579,7 @@ export default function TaskBoardPage() {
                                       }}
                                       className="px-3 py-2 text-sm cursor-pointer mb-1 rounded bg-[#e6e9ef] text-[#676879] text-center hover:opacity-90"
                                     >
-                                      - None
+                                      - {getPriorityLabel('')}
                                     </div>
                                     {PRIORITIES.map(p => (
                                       <div

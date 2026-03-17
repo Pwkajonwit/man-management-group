@@ -235,7 +235,7 @@ export interface NotificationSettings {
     employeeReportFrequency: 'daily' | 'weekly';
     employeeReportDayOfWeek: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
     employeeReportTime: string; // HH:mm
-    employeeReportScope: 'active-project' | 'all-projects';
+    employeeReportScope: 'active-project' | 'all-projects' | 'active-branch' | 'active-department';
     employeeReportTemplate: 'compact' | 'detailed';
     employeeReportIncludeOverdue: boolean;
     employeeReportIncludeDueSoon: boolean;

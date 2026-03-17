@@ -12,16 +12,16 @@ export default function AdminGate({ children }: { children: React.ReactNode }) {
     const { loading, isAuthenticated, user, logoutUser } = useAuth();
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
-    if (loading) return <LinearLoadingScreen message="Preparing workspace..." />;
+    if (loading) return <LinearLoadingScreen message="กำลังเตรียมพื้นที่ทำงาน..." />;
 
     if (!isAuthenticated) return <LoginPage />;
     if (!hasAdminAccess(user?.role)) {
         return (
             <div className="min-h-dvh bg-[#f5f6f8] flex items-center justify-center p-4">
                 <div className="max-w-md w-full rounded-xl border border-[#d0d4e4] bg-white p-5 text-center">
-                    <p className="text-[16px] font-semibold text-[#323338]">Access denied</p>
+                    <p className="text-[16px] font-semibold text-[#323338]">ไม่มีสิทธิ์เข้าถึง</p>
                     <p className="text-[13px] text-[#676879] mt-1">
-                        Your account does not have permission to open admin workspace.
+                        บัญชีของคุณไม่มีสิทธิ์เปิดพื้นที่ทำงานสำหรับผู้ดูแลระบบ
                     </p>
                     <button
                         type="button"
@@ -29,7 +29,7 @@ export default function AdminGate({ children }: { children: React.ReactNode }) {
                         className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-[#d0d4e4] bg-white px-4 py-2 text-[13px] font-semibold text-[#323338] hover:bg-[#f5f6f8]"
                     >
                         <LogOut className="w-4 h-4" />
-                        Logout
+                        ออกจากระบบ
                     </button>
                 </div>
             </div>
@@ -45,11 +45,11 @@ export default function AdminGate({ children }: { children: React.ReactNode }) {
                         type="button"
                         onClick={() => setMobileSidebarOpen(true)}
                         className="p-2 rounded-lg hover:bg-[#f5f6f8] text-[#323338]"
-                        aria-label="Open menu"
+                        aria-label="เปิดเมนู"
                     >
                         <Menu className="w-5 h-5" />
                     </button>
-                    <div className="font-bold text-[15px] tracking-tight">WorkOS Admin</div>
+                    <div className="font-bold text-[15px] tracking-tight">ผู้ดูแลระบบ</div>
                     <div className="w-9" />
                 </div>
                 <div className="flex-1 min-w-0 min-h-0 overflow-y-auto">
@@ -63,7 +63,7 @@ export default function AdminGate({ children }: { children: React.ReactNode }) {
                         type="button"
                         className="absolute inset-0 bg-black/40"
                         onClick={() => setMobileSidebarOpen(false)}
-                        aria-label="Close menu backdrop"
+                        aria-label="ปิดฉากหลังเมนู"
                     />
                     <div className="relative h-full">
                         <div className="absolute left-0 top-0 h-full shadow-2xl">
@@ -72,7 +72,7 @@ export default function AdminGate({ children }: { children: React.ReactNode }) {
                                 type="button"
                                 onClick={() => setMobileSidebarOpen(false)}
                                 className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white border border-[#d0d4e4] flex items-center justify-center text-[#676879]"
-                                aria-label="Close menu"
+                                aria-label="ปิดเมนู"
                             >
                                 <X className="w-4 h-4" />
                             </button>

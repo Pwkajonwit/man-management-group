@@ -4,8 +4,10 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { initializeLiff, getLineProfile, loginWithLine, logout as lineLogout, isLoggedIn, LineProfile } from '@/lib/line';
 import { auth, hasFirebaseConfig } from '@/lib/firebase';
 import {
+    browserLocalPersistence,
     createUserWithEmailAndPassword,
     onAuthStateChanged,
+    setPersistence,
     signInWithEmailAndPassword,
     signOut,
     updateProfile,
@@ -182,6 +184,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const handleAuthState = async (firebaseUser: FirebaseUser | null) => {
             try {
                 const liffReady = await initializeLiff();
+                if (firebaseUser && mounted) {
+                    const account = await getSystemUserAccountById(firebaseUser.uid);
+                    const baseUser = mapFirebaseUser(firebaseUser);
+
+                    if (account) {
+                        if (liffReady && isLoggedIn()) {
+                            const profile = await getLineProfile();
+                            const normalizedPictureUrl = normalizeLinePictureUrl(profile?.pictureUrl);
+                            setPendingLineProfile(null);
+                            setRequiresLinePhoneBinding(false);
+                            setUser(mergeSystemScope({
+                                ...baseUser,
+                                ...(profile?.userId ? { lineUserId: profile.userId } : {}),
+                                ...(normalizedPictureUrl ? { pictureUrl: normalizedPictureUrl } : {}),
+                            }, account));
+                            setLoading(false);
+                            return;
+                        }
+
+                        setPendingLineProfile(null);
+                        setRequiresLinePhoneBinding(false);
+                        setUser(mergeSystemScope(baseUser, account));
+                        setLoading(false);
+                        return;
+                    }
+                }
+
                 if (liffReady && isLoggedIn()) {
                     const profile = await getLineProfile();
                     if (profile && mounted) {
@@ -270,6 +299,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             mounted = false;
             unsub();
         };
+    }, []);
+
+    useEffect(() => {
+        if (!hasFirebaseConfig) return;
+        void setPersistence(auth, browserLocalPersistence).catch((err) => {
+            console.error('Failed to set Firebase auth persistence:', err);
+        });
     }, []);
 
     const loginLine = () => {
@@ -362,6 +398,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             throw new Error('Please enter User/Email and Password.');
         }
 
+        await setPersistence(auth, browserLocalPersistence);
         const credential = await signInWithEmailAndPassword(auth, email, password);
         try {
             const createdAtRaw = credential.user.metadata.creationTime;
@@ -392,6 +429,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             throw new Error('Please enter User/Email and Password.');
         }
 
+        await setPersistence(auth, browserLocalPersistence);
         const credential = await createUserWithEmailAndPassword(auth, email, password);
         const finalName = (displayName || userOrEmail).trim();
         if (finalName) {

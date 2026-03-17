@@ -40,6 +40,7 @@ import {
     isLegacyDefaultDepartmentId,
 } from '@/lib/scope';
 import { canAccessScopedRecord, canSelectScope, resolveUserScope } from '@/lib/rbac';
+import { isTaskAssignedToCurrentUser } from '@/utils/taskOwnerUtils';
 
 interface TaskUpdate {
     id: string;
@@ -231,10 +232,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const userScope = useMemo(() => resolveUserScope(user), [user]);
     const isScopeSelectionEnabled = useMemo(() => canSelectScope(userScope.role), [userScope.role]);
+    const personallyAssignedTaskIdSet = useMemo(() => {
+        if (!user) return new Set<string>();
+        return new Set(
+            tasks
+                .filter((task) => isTaskAssignedToCurrentUser(task, teamMembers, currentUserName, user.lineUserId, user.uid))
+                .map((task) => task.id)
+        );
+    }, [currentUserName, tasks, teamMembers, user]);
+    const personallyAssignedProjectIdSet = useMemo(
+        () => new Set(tasks.filter((task) => personallyAssignedTaskIdSet.has(task.id)).map((task) => task.projectId)),
+        [personallyAssignedTaskIdSet, tasks]
+    );
 
     const roleScopedProjects = useMemo(
-        () => projects.filter((project) => canAccessScopedRecord(userScope, project)),
-        [projects, userScope]
+        () => projects.filter((project) => canAccessScopedRecord(userScope, project) || (userScope.role === 'staff' && personallyAssignedProjectIdSet.has(project.id))),
+        [personallyAssignedProjectIdSet, projects, userScope]
     );
     const roleScopedTeamMembers = useMemo(
         () => teamMembers.filter((member) => canAccessScopedRecord(userScope, member)),
@@ -245,8 +258,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         [roleScopedProjects]
     );
     const roleScopedTasks = useMemo(
-        () => tasks.filter((task) => roleScopedProjectIdSet.has(task.projectId) && canAccessScopedRecord(userScope, task)),
-        [tasks, roleScopedProjectIdSet, userScope]
+        () => tasks.filter((task) => (
+            (roleScopedProjectIdSet.has(task.projectId) && canAccessScopedRecord(userScope, task))
+            || (userScope.role === 'staff' && personallyAssignedTaskIdSet.has(task.id))
+        )),
+        [personallyAssignedTaskIdSet, tasks, roleScopedProjectIdSet, userScope]
     );
 
     const allAccessibleBranchIds = useMemo(() => {
@@ -436,6 +452,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const selectedScopedProjects = useMemo(() => {
         return roleScopedProjects.filter((project) => {
+            const isPersonalProject = userScope.role === 'staff' && personallyAssignedProjectIdSet.has(project.id);
+            if (isPersonalProject) return true;
+
             const projectBranchId = project.branchId || DEFAULT_BRANCH_ID;
             const projectDepartmentId = project.departmentId || DEFAULT_DEPARTMENT_ID;
 
@@ -443,7 +462,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             if (effectiveScopeDepartmentId !== ALL_SCOPE_VALUE && projectDepartmentId !== effectiveScopeDepartmentId) return false;
             return true;
         });
-    }, [effectiveScopeBranchId, effectiveScopeDepartmentId, roleScopedProjects]);
+    }, [effectiveScopeBranchId, effectiveScopeDepartmentId, personallyAssignedProjectIdSet, roleScopedProjects, userScope.role]);
 
     const selectedScopedProjectIdSet = useMemo(
         () => new Set(selectedScopedProjects.map((project) => project.id)),
@@ -452,6 +471,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const selectedScopedTasks = useMemo(() => {
         return roleScopedTasks.filter((task) => {
+            const isPersonalTask = userScope.role === 'staff' && personallyAssignedTaskIdSet.has(task.id);
+            if (isPersonalTask) return true;
+
             if (!selectedScopedProjectIdSet.has(task.projectId)) return false;
             const taskBranchId = task.branchId || DEFAULT_BRANCH_ID;
             const taskDepartmentId = task.departmentId || DEFAULT_DEPARTMENT_ID;
@@ -460,7 +482,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             if (effectiveScopeDepartmentId !== ALL_SCOPE_VALUE && taskDepartmentId !== effectiveScopeDepartmentId) return false;
             return true;
         });
-    }, [effectiveScopeBranchId, effectiveScopeDepartmentId, roleScopedTasks, selectedScopedProjectIdSet]);
+    }, [effectiveScopeBranchId, effectiveScopeDepartmentId, personallyAssignedTaskIdSet, roleScopedTasks, selectedScopedProjectIdSet, userScope.role]);
 
     const selectedScopedTeamMembers = useMemo(() => {
         return roleScopedTeamMembers.filter((member) => {

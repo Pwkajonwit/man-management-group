@@ -14,25 +14,25 @@ const settingItems: Array<{
     description: string;
     icon: React.ComponentType<{ className?: string }>;
 }> = [
-    {
-        key: 'notifyTaskAssigned',
-        title: 'แจ้งเตือนเมื่อมอบหมายงาน',
-        description: 'ส่งข้อความ LINE เมื่อมีการมอบหมายงานให้ผู้รับผิดชอบใหม่',
-        icon: UserPlus,
-    },
-    {
-        key: 'notifyTaskStatusChanged',
-        title: 'แจ้งเตือนเมื่อเปลี่ยนสถานะ',
-        description: 'ส่งข้อความ LINE เมื่อสถานะงานถูกเปลี่ยน',
-        icon: RefreshCw,
-    },
-    {
-        key: 'notifyTaskCommentAdded',
-        title: 'แจ้งเตือนการแสดงความคิดเห็น',
-        description: 'ส่งข้อความ LINE เมื่อมีการอัปเดตงานหรือแสดงความคิดเห็น',
-        icon: MessageSquare,
-    },
-];
+        {
+            key: 'notifyTaskAssigned',
+            title: 'แจ้งเตือนเมื่อมอบหมายงาน',
+            description: 'ส่งข้อความ LINE เมื่อมีการมอบหมายงานให้ผู้รับผิดชอบใหม่',
+            icon: UserPlus,
+        },
+        {
+            key: 'notifyTaskStatusChanged',
+            title: 'แจ้งเตือนเมื่อเปลี่ยนสถานะ',
+            description: 'ส่งข้อความ LINE เมื่อสถานะงานถูกเปลี่ยน',
+            icon: RefreshCw,
+        },
+        {
+            key: 'notifyTaskCommentAdded',
+            title: 'แจ้งเตือนการแสดงความคิดเห็น',
+            description: 'ส่งข้อความ LINE เมื่อมีการอัปเดตงานหรือแสดงความคิดเห็น',
+            icon: MessageSquare,
+        },
+    ];
 
 const dayOptions = [
     'monday',
@@ -72,6 +72,10 @@ export default function SettingsPage() {
         tasks,
         projects,
         activeProjectId,
+        scopeBranchId,
+        scopeDepartmentId,
+        taskScopeBranchOptions,
+        taskScopeDepartmentOptions,
     } = useAppContext();
 
     const [savingKey, setSavingKey] = useState<ToggleSettingKey | null>(null);
@@ -85,7 +89,7 @@ export default function SettingsPage() {
     const [employeeReportFrequency, setEmployeeReportFrequency] = useState<'daily' | 'weekly'>('weekly');
     const [employeeReportDayOfWeek, setEmployeeReportDayOfWeek] = useState<(typeof dayOptions)[number]>('monday');
     const [employeeReportTime, setEmployeeReportTime] = useState('17:00');
-    const [employeeReportScope, setEmployeeReportScope] = useState<'active-project' | 'all-projects'>('active-project');
+    const [employeeReportScope, setEmployeeReportScope] = useState<'active-project' | 'all-projects' | 'active-branch' | 'active-department'>('active-project');
     const [employeeReportTemplate, setEmployeeReportTemplate] = useState<'compact' | 'detailed'>('detailed');
     const [employeeReportIncludeOverdue, setEmployeeReportIncludeOverdue] = useState(true);
     const [employeeReportIncludeDueSoon, setEmployeeReportIncludeDueSoon] = useState(true);
@@ -100,6 +104,14 @@ export default function SettingsPage() {
     const reportableMembers = useMemo(
         () => teamMembers.filter((member) => member.memberType !== 'crew'),
         [teamMembers]
+    );
+    const branchLabelById = useMemo(
+        () => new Map(taskScopeBranchOptions.map((option) => [option.id, option.label])),
+        [taskScopeBranchOptions]
+    );
+    const departmentLabelById = useMemo(
+        () => new Map(taskScopeDepartmentOptions.map((option) => [option.id, option.label])),
+        [taskScopeDepartmentOptions]
     );
 
     useEffect(() => {
@@ -166,32 +178,90 @@ export default function SettingsPage() {
         }
     };
 
-    const membersWithLine = useMemo(
-        () => reportableMembers.filter((member) => Boolean(member.lineUserId && member.lineUserId.trim())),
-        [reportableMembers]
-    );
-
     const activeProject = useMemo(
         () => projects.find((project) => project.id === activeProjectId),
         [projects, activeProjectId]
     );
+    const resolvedReportBranchId = useMemo(() => {
+        if (scopeBranchId && scopeBranchId !== 'all' && taskScopeBranchOptions.some((option) => option.id === scopeBranchId)) {
+            return scopeBranchId;
+        }
+        if (activeProject?.branchId && taskScopeBranchOptions.some((option) => option.id === activeProject.branchId)) {
+            return activeProject.branchId;
+        }
+        return taskScopeBranchOptions[0]?.id || '';
+    }, [activeProject?.branchId, scopeBranchId, taskScopeBranchOptions]);
+    const resolvedReportDepartmentId = useMemo(() => {
+        if (scopeDepartmentId && scopeDepartmentId !== 'all' && taskScopeDepartmentOptions.some((option) => option.id === scopeDepartmentId)) {
+            return scopeDepartmentId;
+        }
+        if (activeProject?.departmentId && taskScopeDepartmentOptions.some((option) => option.id === activeProject.departmentId)) {
+            return activeProject.departmentId;
+        }
+        return taskScopeDepartmentOptions.find((option) => !option.branchId || option.branchId === resolvedReportBranchId)?.id
+            || taskScopeDepartmentOptions[0]?.id
+            || '';
+    }, [activeProject?.departmentId, resolvedReportBranchId, scopeDepartmentId, taskScopeDepartmentOptions]);
+    const reportScopeLabel = useMemo(() => {
+        if (employeeReportScope === 'all-projects') return 'ทุกโครงการ';
+        if (employeeReportScope === 'active-project') return activeProject?.name || 'โครงการปัจจุบัน';
+        if (employeeReportScope === 'active-branch') {
+            return `สาขา: ${branchLabelById.get(resolvedReportBranchId) || resolvedReportBranchId || '-'}`;
+        }
+        return `แผนก: ${departmentLabelById.get(resolvedReportDepartmentId) || resolvedReportDepartmentId || '-'}`
+            + ` / ${branchLabelById.get(resolvedReportBranchId) || resolvedReportBranchId || '-'}`;
+    }, [activeProject?.name, branchLabelById, departmentLabelById, employeeReportScope, resolvedReportBranchId, resolvedReportDepartmentId]);
 
     const scopedTasks = useMemo(() => {
         if (employeeReportScope === 'all-projects') return tasks;
-        return tasks.filter((task) => task.projectId === activeProjectId);
-    }, [employeeReportScope, tasks, activeProjectId]);
+        if (employeeReportScope === 'active-project') {
+            return tasks.filter((task) => task.projectId === activeProjectId);
+        }
+        if (employeeReportScope === 'active-branch') {
+            if (!resolvedReportBranchId) return [];
+            return tasks.filter((task) => (task.branchId || '') === resolvedReportBranchId);
+        }
+        if (!resolvedReportBranchId || !resolvedReportDepartmentId) return [];
+        return tasks.filter((task) =>
+            (task.branchId || '') === resolvedReportBranchId
+            && (task.departmentId || '') === resolvedReportDepartmentId
+        );
+    }, [employeeReportScope, tasks, activeProjectId, resolvedReportBranchId, resolvedReportDepartmentId]);
+    const scopedReportableMembers = useMemo(() => {
+        if (employeeReportScope === 'all-projects') return reportableMembers;
+        if (employeeReportScope === 'active-project') {
+            if (!activeProject) return reportableMembers;
+            return reportableMembers.filter((member) => (
+                (member.branchId || '') === (activeProject.branchId || '')
+                && (member.departmentId || '') === (activeProject.departmentId || '')
+            ));
+        }
+        if (employeeReportScope === 'active-branch') {
+            if (!resolvedReportBranchId) return [];
+            return reportableMembers.filter((member) => (member.branchId || '') === resolvedReportBranchId);
+        }
+        if (!resolvedReportBranchId || !resolvedReportDepartmentId) return [];
+        return reportableMembers.filter((member) => (
+            (member.branchId || '') === resolvedReportBranchId
+            && (member.departmentId || '') === resolvedReportDepartmentId
+        ));
+    }, [activeProject, employeeReportScope, reportableMembers, resolvedReportBranchId, resolvedReportDepartmentId]);
+    const membersWithLine = useMemo(
+        () => scopedReportableMembers.filter((member) => Boolean(member.lineUserId && member.lineUserId.trim())),
+        [scopedReportableMembers]
+    );
 
     const selectedMember = useMemo(
-        () => reportableMembers.find((member) => member.id === employeeReportTestMemberId) || null,
-        [reportableMembers, employeeReportTestMemberId]
+        () => scopedReportableMembers.find((member) => member.id === employeeReportTestMemberId) || null,
+        [scopedReportableMembers, employeeReportTestMemberId]
     );
 
     useEffect(() => {
         if (!employeeReportTestMemberId) return;
-        if (!reportableMembers.some((member) => member.id === employeeReportTestMemberId)) {
+        if (!scopedReportableMembers.some((member) => member.id === employeeReportTestMemberId)) {
             setEmployeeReportTestMemberId('');
         }
-    }, [employeeReportTestMemberId, reportableMembers]);
+    }, [employeeReportTestMemberId, scopedReportableMembers]);
 
     const preview = useMemo(() => {
         if (!selectedMember) {
@@ -239,19 +309,19 @@ export default function SettingsPage() {
 
     const handleSendEmployeeTest = async () => {
         if (!selectedMember) {
-            alert('Please select a team member');
+            alert('กรุณาเลือกพนักงาน');
             return;
         }
         if (!selectedMember.lineUserId) {
-            alert('Selected member does not have LINE user ID');
+            alert('พนักงานที่เลือกยังไม่ได้ผูก LINE');
             return;
         }
 
         try {
             setIsSendingTest(true);
             const periodLabel = employeeReportFrequency === 'weekly'
-                ? `Weekly Snapshot (${new Date().toLocaleDateString('en-GB')})`
-                : `Daily Snapshot (${new Date().toLocaleDateString('en-GB')})`;
+                ? `สรุปรายสัปดาห์ (${new Date().toLocaleDateString('th-TH')})`
+                : `สรุปรายวัน (${new Date().toLocaleDateString('th-TH')})`;
 
             const response = await fetch('/api/line-employee-report', {
                 method: 'POST',
@@ -259,7 +329,7 @@ export default function SettingsPage() {
                 body: JSON.stringify({
                     to: selectedMember.lineUserId,
                     employeeName: selectedMember.name,
-                    projectName: employeeReportScope === 'all-projects' ? 'All Projects' : (activeProject?.name || 'Active Project'),
+                    projectName: reportScopeLabel,
                     periodLabel,
                     template: employeeReportTemplate,
                     summary: {
@@ -277,14 +347,14 @@ export default function SettingsPage() {
                         endDate: task.planEndDate,
                         durationDays: task.planDuration,
                         dueDate: task.planEndDate,
-                        projectName: projects.find((project) => project.id === task.projectId)?.name || 'Unknown Project',
+                        projectName: projects.find((project) => project.id === task.projectId)?.name || 'โครงการที่ไม่ทราบชื่อ',
                     })),
                 }),
             });
 
             const data = await response.json();
             if (!response.ok || !data?.ok) {
-                throw new Error(data?.error || 'Failed to send employee report');
+                throw new Error(data?.error || 'ไม่สามารถส่งรายงานพนักงานได้');
             }
 
             alert(`ส่งรายงานทดสอบไปยัง ${selectedMember.name} เรียบร้อยแล้ว`);
@@ -348,7 +418,7 @@ export default function SettingsPage() {
             </header>
 
             <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
-                <div className="max-w-[1200px] grid grid-cols-1 xl:grid-cols-3 gap-4">
+                <div className="max-w-[1500px] grid grid-cols-1 xl:grid-cols-3 gap-4">
                     <div className="xl:col-span-2 space-y-4">
                         <div className="bg-white border border-[#d0d4e4] rounded-xl p-4 space-y-3">
                             <div className="flex items-center gap-2 text-[15px] font-semibold text-[#323338]">
@@ -416,11 +486,13 @@ export default function SettingsPage() {
                                 </div>
                                 <select
                                     value={employeeReportScope}
-                                    onChange={(e) => setEmployeeReportScope(e.target.value as 'active-project' | 'all-projects')}
+                                    onChange={(e) => setEmployeeReportScope(e.target.value as 'active-project' | 'all-projects' | 'active-branch' | 'active-department')}
                                     className="h-10 px-3 border border-[#d0d4e4] rounded-lg text-[13px] outline-none bg-white"
                                 >
                                     <option value="active-project">ขอบเขต: โครงการปัจจุบัน</option>
                                     <option value="all-projects">ขอบเขต: โครงการทั้งหมด</option>
+                                    <option value="active-branch">ขอบเขต: สาขาปัจจุบัน</option>
+                                    <option value="active-department">ขอบเขต: แผนกปัจจุบัน</option>
                                 </select>
                             </div>
 
@@ -452,7 +524,7 @@ export default function SettingsPage() {
                                     placeholder="แจ้งเตือนก่อน (วัน)"
                                 />
                                 <div className="h-10 px-3 border border-[#d0d4e4] rounded-lg text-[12px] text-[#676879] flex items-center">
-                                    โครงการปัจจุบัน: {activeProject?.name || 'ไม่มี'}
+                                    ขอบเขตที่ใช้: {reportScopeLabel}
                                 </div>
                             </div>
 
@@ -491,6 +563,10 @@ export default function SettingsPage() {
                                     <option key={member.id} value={member.id}>{member.name}</option>
                                 ))}
                             </select>
+
+                            <div className="rounded-lg border border-[#e6e9ef] bg-[#f8fbff] px-3 py-2 text-[12px] text-[#516273]">
+                                ขอบเขตรายงาน: {reportScopeLabel}
+                            </div>
 
                             <div className="grid grid-cols-3 gap-2 text-center">
                                 <div className="rounded-lg border border-[#e6e9ef] p-2">

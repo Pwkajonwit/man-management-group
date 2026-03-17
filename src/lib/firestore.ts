@@ -318,7 +318,12 @@ export function subscribeNotificationSettings(callback: (settings: NotificationS
                 return 'monday';
             })(),
             employeeReportTime: typeof data.employeeReportTime === 'string' && /^\d{2}:\d{2}$/.test(data.employeeReportTime) ? data.employeeReportTime : '17:00',
-            employeeReportScope: data.employeeReportScope === 'all-projects' ? 'all-projects' : 'active-project',
+            employeeReportScope:
+                data.employeeReportScope === 'all-projects'
+                    || data.employeeReportScope === 'active-branch'
+                    || data.employeeReportScope === 'active-department'
+                    ? data.employeeReportScope
+                    : 'active-project',
             employeeReportTemplate: data.employeeReportTemplate === 'compact' ? 'compact' : 'detailed',
             employeeReportIncludeOverdue: data.employeeReportIncludeOverdue ?? true,
             employeeReportIncludeDueSoon: data.employeeReportIncludeDueSoon ?? true,

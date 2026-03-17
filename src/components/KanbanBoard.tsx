@@ -5,6 +5,7 @@ import { Task } from '@/types/construction';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, GripVertical, Clock, ChevronRight } from 'lucide-react';
 import { format, isPast } from 'date-fns';
+import { getStatusLabel } from '@/utils/statusUtils';
 
 const getPriorityDotColor = (p?: string) => {
     switch (p) {
@@ -23,10 +24,10 @@ interface KanbanBoardProps {
 }
 
 const STATUS_COLUMNS: { key: Task['status']; label: string; color: string; bgLight: string }[] = [
-    { key: 'not-started', label: 'Not Started', color: '#c4c4c4', bgLight: '#f5f5f5' },
-    { key: 'in-progress', label: 'Working on it', color: '#fdab3d', bgLight: '#fff8f0' },
-    { key: 'completed', label: 'Done', color: '#00c875', bgLight: '#eefbf3' },
-    { key: 'delayed', label: 'Stuck', color: '#e2445c', bgLight: '#fef2f2' },
+    { key: 'not-started', label: getStatusLabel('not-started'), color: '#c4c4c4', bgLight: '#f5f5f5' },
+    { key: 'in-progress', label: getStatusLabel('in-progress'), color: '#fdab3d', bgLight: '#fff8f0' },
+    { key: 'completed', label: getStatusLabel('completed'), color: '#00c875', bgLight: '#eefbf3' },
+    { key: 'delayed', label: getStatusLabel('delayed'), color: '#e2445c', bgLight: '#fef2f2' },
 ];
 
 const formatDateDisplay = (value?: string): string => {

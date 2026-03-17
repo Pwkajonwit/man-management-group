@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { Task } from '@/types/construction';
-import { getStatusColor, getStatusLabel } from '@/utils/statusUtils';
+import { getPriorityLabel, getStatusColor, getStatusLabel } from '@/utils/statusUtils';
 import {
     DEFAULT_BRANCH_ID,
     DEFAULT_DEPARTMENT_ID,
@@ -27,16 +27,6 @@ const getPriorityColor = (p?: string) => {
         default: return 'bg-[#e6e9ef] text-[#676879]';
     }
 };
-const getPriorityLabel = (p?: string) => {
-    switch (p) {
-        case 'urgent': return 'Urgent';
-        case 'high': return 'High';
-        case 'medium': return 'Medium';
-        case 'low': return 'Low';
-        default: return '-';
-    }
-};
-
 const getFileIcon = (type: string) => {
     if (type.startsWith('image/')) return <ImageIcon className="w-5 h-5 text-[#579bfc]" />;
     if (type.includes('pdf')) return <FileText className="w-5 h-5 text-[#e2445c]" />;
@@ -322,10 +312,10 @@ export default function TaskDetailPage() {
                                         onChange={e => handleUpdateTaskStatus(taskId, e.target.value as Task['status'])}
                                         className="w-full bg-[#f5f6f8] border border-[#d0d4e4] rounded-lg px-3 py-1.5 text-[13px] outline-none cursor-pointer"
                                     >
-                                        <option value="not-started">Not Started</option>
-                                        <option value="in-progress">Working on it</option>
-                                        <option value="completed">Done</option>
-                                        <option value="delayed">Stuck</option>
+                                        <option value="not-started">{getStatusLabel('not-started')}</option>
+                                        <option value="in-progress">{getStatusLabel('in-progress')}</option>
+                                        <option value="completed">{getStatusLabel('completed')}</option>
+                                        <option value="delayed">{getStatusLabel('delayed')}</option>
                                     </select>
                                 </div>
 
@@ -337,11 +327,11 @@ export default function TaskDetailPage() {
                                         onChange={e => handleUpdateTaskPriority(taskId, e.target.value as Task['priority'] | '')}
                                         className="w-full bg-[#f5f6f8] border border-[#d0d4e4] rounded-lg px-3 py-1.5 text-[13px] outline-none cursor-pointer"
                                     >
-                                        <option value="">None</option>
-                                        <option value="urgent">Urgent</option>
-                                        <option value="high">High</option>
-                                        <option value="medium">Medium</option>
-                                        <option value="low">Low</option>
+                                        <option value="">{getPriorityLabel('')}</option>
+                                        <option value="urgent">{getPriorityLabel('urgent')}</option>
+                                        <option value="high">{getPriorityLabel('high')}</option>
+                                        <option value="medium">{getPriorityLabel('medium')}</option>
+                                        <option value="low">{getPriorityLabel('low')}</option>
                                     </select>
                                 </div>
 
