@@ -537,7 +537,7 @@ export default function TaskBoardPage() {
       return;
     }
     closeAllDropdowns();
-    setOwnerDropdownAnchor(getDropdownAnchor(anchorEl, 192, 320));
+    setOwnerDropdownAnchor(getDropdownAnchor(anchorEl, 280, 320));
     setActiveOwnerDropdown(taskId);
   };
 
@@ -1487,7 +1487,7 @@ export default function TaskBoardPage() {
                                 {activeOwnerDropdown === task.id && ownerDropdownAnchor && createPortal(
                                   <div
                                     ref={activeDropdownRef}
-                                    className="fixed z-[220] flex w-48 flex-col overflow-hidden rounded-lg border border-[#d0d4e4] bg-white py-2 shadow-xl"
+                                    className="fixed z-[220] flex w-[280px] flex-col overflow-hidden rounded-lg border border-[#d0d4e4] bg-white py-2 shadow-xl"
                                     style={{
                                       left: ownerDropdownAnchor.x,
                                       top: ownerDropdownAnchor.y,
@@ -1497,34 +1497,50 @@ export default function TaskBoardPage() {
                                   >
                                     <div className="px-3 py-1 text-xs font-semibold text-[#676879] uppercase tracking-wider">กำหนดผู้รับผิดชอบ</div>
                                     <div className="mt-1 min-h-0 flex-1 overflow-y-auto overscroll-contain">
-                                      <div
-                                        className="px-3 py-2 text-sm hover:bg-[#f5f6f8] cursor-pointer text-[#676879] italic border-b border-[#e6e9ef]"
+                                      <button
+                                        type="button"
+                                        className="mx-3 mb-2 flex h-10 w-10 items-center justify-center rounded-full border border-dashed border-[#c7cedb] bg-[#f5f6f8] text-[#676879] transition-colors hover:border-[#0073ea] hover:text-[#0073ea]"
                                         onClick={() => { handleUpdateTaskOwners(task.id, []); }}
+                                        title={'\u0e44\u0e21\u0e48\u0e44\u0e14\u0e49\u0e01\u0e33\u0e2b\u0e19\u0e14\u0e1c\u0e39\u0e49\u0e23\u0e31\u0e1a\u0e1c\u0e34\u0e14\u0e0a\u0e2d\u0e1a'}
                                       >
-                                        ไม่ได้กำหนดผู้รับผิดชอบ
+                                        <X className="h-4 w-4" />
+                                      </button>
+                                      <div className="grid grid-cols-5 gap-2 px-3 pb-2">
+                                        {teamMembers.map(member => {
+                                          const isSelected = ownerNames.includes(member.name);
+                                          return (
+                                            <button
+                                              key={member.id}
+                                              type="button"
+                                              className={`relative flex h-11 w-11 items-center justify-center rounded-full transition-all ${isSelected ? 'ring-2 ring-[#0073ea] ring-offset-2 ring-offset-white' : 'hover:scale-105'}`}
+                                              onClick={() => {
+                                                const nextOwners = isSelected
+                                                  ? ownerNames.filter((owner) => owner !== member.name)
+                                                  : [...ownerNames, member.name];
+                                                handleUpdateTaskOwners(task.id, nextOwners);
+                                              }}
+                                              title={member.name}
+                                            >
+                                              {member.avatar ? (
+                                                <img
+                                                  src={member.avatar}
+                                                  alt={member.name}
+                                                  className="h-11 w-11 rounded-full border border-white object-cover"
+                                                />
+                                              ) : (
+                                                <div className="flex h-11 w-11 items-center justify-center rounded-full border border-white bg-[#e6e9ef] text-[12px] font-semibold text-[#323338]">
+                                                  {member.name.substring(0, 2).toUpperCase()}
+                                                </div>
+                                              )}
+                                              {isSelected && (
+                                                <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#0073ea] text-white shadow-sm">
+                                                  <Check className="h-3 w-3" />
+                                                </div>
+                                              )}
+                                            </button>
+                                          );
+                                        })}
                                       </div>
-                                      {teamMembers.map(member => (
-                                        <div
-                                          key={member.id}
-                                          className={`px-3 py-2 text-sm hover:bg-[#f5f6f8] cursor-pointer border-b border-[#e6e9ef] last:border-0 ${ownerNames.includes(member.name) ? 'bg-[#cce5ff]' : ''}`}
-                                          onClick={() => {
-                                            const nextOwners = ownerNames.includes(member.name)
-                                              ? ownerNames.filter((owner) => owner !== member.name)
-                                              : [...ownerNames, member.name];
-                                            handleUpdateTaskOwners(task.id, nextOwners);
-                                          }}
-                                        >
-                                          <div className={`font-medium flex items-center justify-between ${ownerNames.includes(member.name) ? 'text-[#0052cc]' : 'text-[#323338]'}`}>
-                                            {member.name}
-                                            {ownerNames.includes(member.name) && (
-                                              <Check className="w-3.5 h-3.5 text-[#0073ea]" />
-                                            )}
-                                          </div>
-                                          <div className="text-xs text-[#676879] mt-0.5">
-                                            {member.position} - {member.department}
-                                          </div>
-                                        </div>
-                                      ))}
                                     </div>
                                     <div className="px-3 pt-2 mt-1 border-t border-[#e6e9ef] flex items-center justify-between">
                                       <span className="text-[11px] text-[#676879]">{ownerNames.length} รายการที่เลือก</span>
