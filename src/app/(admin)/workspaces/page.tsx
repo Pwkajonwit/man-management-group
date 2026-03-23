@@ -29,6 +29,15 @@ import {
 const PRIORITIES = ['urgent', 'high', 'medium', 'low'] as const;
 const TASK_STATUSES: Task['status'][] = ['not-started', 'in-progress', 'completed', 'delayed'];
 const PROJECT_STATUSES: Project['status'][] = ['planning', 'in-progress', 'on-hold', 'completed'];
+const DROPDOWN_VIEWPORT_PADDING = 12;
+const DROPDOWN_OFFSET = 6;
+
+type DropdownAnchor = {
+  x: number;
+  y: number;
+  maxHeight: number;
+  transform: string;
+};
 
 const getPriorityColor = (priority?: string) => {
   switch (priority) {
@@ -77,11 +86,11 @@ export default function TaskBoardPage() {
 
   const [activeTab, setActiveTab] = useState<'table' | 'kanban' | 'calendar'>('table');
   const [activeOwnerDropdown, setActiveOwnerDropdown] = useState<string | null>(null);
-  const [ownerDropdownAnchor, setOwnerDropdownAnchor] = useState<{ x: number; y: number } | null>(null);
+  const [ownerDropdownAnchor, setOwnerDropdownAnchor] = useState<DropdownAnchor | null>(null);
   const [activeStatusDropdown, setActiveStatusDropdown] = useState<string | null>(null);
-  const [statusDropdownAnchor, setStatusDropdownAnchor] = useState<{ x: number; y: number } | null>(null);
+  const [statusDropdownAnchor, setStatusDropdownAnchor] = useState<DropdownAnchor | null>(null);
   const [activePriorityDropdown, setActivePriorityDropdown] = useState<string | null>(null);
-  const [priorityDropdownAnchor, setPriorityDropdownAnchor] = useState<{ x: number; y: number } | null>(null);
+  const [priorityDropdownAnchor, setPriorityDropdownAnchor] = useState<DropdownAnchor | null>(null);
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [taskUpdateText, setTaskUpdateText] = useState("");
@@ -112,6 +121,7 @@ export default function TaskBoardPage() {
   const [sortBy, setSortBy] = useState<string>("default"); // default, priority, dueDate, progress
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const activeDropdownRef = useRef<HTMLDivElement | null>(null);
 
   const activeProject = projects.find(p => p.id === activeProjectId);
   const projectTasks = useMemo(
@@ -485,77 +495,88 @@ export default function TaskBoardPage() {
     setTaskUpdateText("");
   };
 
-  const toggleOwnerDropdown = (taskId: string, anchorEl: HTMLDivElement) => {
-    if (activeOwnerDropdown === taskId) {
-      setActiveOwnerDropdown(null);
-      setOwnerDropdownAnchor(null);
-      return;
-    }
+  const closeAllDropdowns = useCallback(() => {
+    setActiveOwnerDropdown(null);
+    setOwnerDropdownAnchor(null);
     setActiveStatusDropdown(null);
     setStatusDropdownAnchor(null);
     setActivePriorityDropdown(null);
     setPriorityDropdownAnchor(null);
+  }, []);
+
+  const getDropdownAnchor = useCallback((
+    anchorEl: HTMLDivElement,
+    dropdownWidth: number,
+    preferredHeight: number,
+  ): DropdownAnchor => {
     const rect = anchorEl.getBoundingClientRect();
-    setOwnerDropdownAnchor({
-      x: rect.left + (rect.width / 2),
-      y: rect.bottom + 6,
-    });
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const centeredX = rect.left + (rect.width / 2);
+    const minCenterX = DROPDOWN_VIEWPORT_PADDING + (dropdownWidth / 2);
+    const maxCenterX = viewportWidth - DROPDOWN_VIEWPORT_PADDING - (dropdownWidth / 2);
+    const clampedX = Math.min(Math.max(centeredX, minCenterX), maxCenterX);
+    const availableBelow = Math.max(
+      viewportHeight - rect.bottom - DROPDOWN_OFFSET - DROPDOWN_VIEWPORT_PADDING,
+      0
+    );
+    const availableAbove = Math.max(rect.top - DROPDOWN_OFFSET - DROPDOWN_VIEWPORT_PADDING, 0);
+    const openUpward = availableBelow < preferredHeight && availableAbove > availableBelow;
+
+    return {
+      x: clampedX,
+      y: openUpward ? rect.top - DROPDOWN_OFFSET : rect.bottom + DROPDOWN_OFFSET,
+      maxHeight: openUpward ? availableAbove : availableBelow,
+      transform: openUpward ? 'translate(-50%, -100%)' : 'translateX(-50%)',
+    };
+  }, []);
+
+  const toggleOwnerDropdown = (taskId: string, anchorEl: HTMLDivElement) => {
+    if (activeOwnerDropdown === taskId) {
+      closeAllDropdowns();
+      return;
+    }
+    closeAllDropdowns();
+    setOwnerDropdownAnchor(getDropdownAnchor(anchorEl, 192, 320));
     setActiveOwnerDropdown(taskId);
   };
 
   const toggleStatusDropdown = (taskId: string, anchorEl: HTMLDivElement) => {
     if (activeStatusDropdown === taskId) {
-      setActiveStatusDropdown(null);
-      setStatusDropdownAnchor(null);
+      closeAllDropdowns();
       return;
     }
-    setActiveOwnerDropdown(null);
-    setOwnerDropdownAnchor(null);
-    setActivePriorityDropdown(null);
-    setPriorityDropdownAnchor(null);
-    const rect = anchorEl.getBoundingClientRect();
-    setStatusDropdownAnchor({
-      x: rect.left + (rect.width / 2),
-      y: rect.bottom + 6,
-    });
+    closeAllDropdowns();
+    setStatusDropdownAnchor(getDropdownAnchor(anchorEl, 160, 220));
     setActiveStatusDropdown(taskId);
   };
 
   const togglePriorityDropdown = (taskId: string, anchorEl: HTMLDivElement) => {
     if (activePriorityDropdown === taskId) {
-      setActivePriorityDropdown(null);
-      setPriorityDropdownAnchor(null);
+      closeAllDropdowns();
       return;
     }
-    setActiveOwnerDropdown(null);
-    setOwnerDropdownAnchor(null);
-    setActiveStatusDropdown(null);
-    setStatusDropdownAnchor(null);
-    const rect = anchorEl.getBoundingClientRect();
-    setPriorityDropdownAnchor({
-      x: rect.left + (rect.width / 2),
-      y: rect.bottom + 6,
-    });
+    closeAllDropdowns();
+    setPriorityDropdownAnchor(getDropdownAnchor(anchorEl, 144, 220));
     setActivePriorityDropdown(taskId);
   };
 
   useEffect(() => {
     if (!activeOwnerDropdown && !activeStatusDropdown && !activePriorityDropdown) return;
-    const closeDropdowns = () => {
-      setActiveOwnerDropdown(null);
-      setOwnerDropdownAnchor(null);
-      setActiveStatusDropdown(null);
-      setStatusDropdownAnchor(null);
-      setActivePriorityDropdown(null);
-      setPriorityDropdownAnchor(null);
+    const handleWindowScroll = (event: Event) => {
+      const targetNode = event.target instanceof Node ? event.target : null;
+      if (targetNode && activeDropdownRef.current?.contains(targetNode)) {
+        return;
+      }
+      closeAllDropdowns();
     };
-    window.addEventListener('scroll', closeDropdowns, true);
-    window.addEventListener('resize', closeDropdowns);
+    window.addEventListener('scroll', handleWindowScroll, true);
+    window.addEventListener('resize', closeAllDropdowns);
     return () => {
-      window.removeEventListener('scroll', closeDropdowns, true);
-      window.removeEventListener('resize', closeDropdowns);
+      window.removeEventListener('scroll', handleWindowScroll, true);
+      window.removeEventListener('resize', closeAllDropdowns);
     };
-  }, [activeOwnerDropdown, activeStatusDropdown, activePriorityDropdown]);
+  }, [activeOwnerDropdown, activePriorityDropdown, activeStatusDropdown, closeAllDropdowns]);
 
   const openDeleteTaskModal = (task: Task) => {
     setPendingDeleteTask(task);
@@ -1465,15 +1486,17 @@ export default function TaskBoardPage() {
                                 </div>
                                 {activeOwnerDropdown === task.id && ownerDropdownAnchor && createPortal(
                                   <div
-                                    className="fixed w-48 bg-white rounded-lg shadow-xl border border-[#d0d4e4] z-[220] py-2"
+                                    ref={activeDropdownRef}
+                                    className="fixed z-[220] flex w-48 flex-col overflow-hidden rounded-lg border border-[#d0d4e4] bg-white py-2 shadow-xl"
                                     style={{
                                       left: ownerDropdownAnchor.x,
                                       top: ownerDropdownAnchor.y,
-                                      transform: 'translateX(-50%)',
+                                      maxHeight: ownerDropdownAnchor.maxHeight,
+                                      transform: ownerDropdownAnchor.transform,
                                     }}
                                   >
                                     <div className="px-3 py-1 text-xs font-semibold text-[#676879] uppercase tracking-wider">กำหนดผู้รับผิดชอบ</div>
-                                    <div className="max-h-64 overflow-y-auto mt-1">
+                                    <div className="mt-1 min-h-0 flex-1 overflow-y-auto overscroll-contain">
                                       <div
                                         className="px-3 py-2 text-sm hover:bg-[#f5f6f8] cursor-pointer text-[#676879] italic border-b border-[#e6e9ef]"
                                         onClick={() => { handleUpdateTaskOwners(task.id, []); }}
@@ -1506,10 +1529,7 @@ export default function TaskBoardPage() {
                                     <div className="px-3 pt-2 mt-1 border-t border-[#e6e9ef] flex items-center justify-between">
                                       <span className="text-[11px] text-[#676879]">{ownerNames.length} รายการที่เลือก</span>
                                       <button
-                                        onClick={() => {
-                                          setActiveOwnerDropdown(null);
-                                          setOwnerDropdownAnchor(null);
-                                        }}
+                                        onClick={closeAllDropdowns}
                                         className="text-[11px] px-2 py-1 rounded bg-[#f5f6f8] hover:bg-[#e6e9ef] text-[#323338]"
                                       >
                                         เสร็จสิ้น
@@ -1529,11 +1549,13 @@ export default function TaskBoardPage() {
                                 </div>
                                 {activeStatusDropdown === task.id && statusDropdownAnchor && createPortal(
                                   <div
-                                    className="fixed w-40 bg-white rounded-lg shadow-xl border border-[#d0d4e4] z-[220] p-1"
+                                    ref={activeDropdownRef}
+                                    className="fixed z-[220] w-40 overflow-y-auto rounded-lg border border-[#d0d4e4] bg-white p-1 shadow-xl"
                                     style={{
                                       left: statusDropdownAnchor.x,
                                       top: statusDropdownAnchor.y,
-                                      transform: 'translateX(-50%)',
+                                      maxHeight: statusDropdownAnchor.maxHeight,
+                                      transform: statusDropdownAnchor.transform,
                                     }}
                                   >
                                     {TASK_STATUSES.map(s => (
@@ -1563,11 +1585,13 @@ export default function TaskBoardPage() {
                                 </div>
                                 {activePriorityDropdown === task.id && priorityDropdownAnchor && createPortal(
                                   <div
-                                    className="fixed w-36 bg-white rounded-lg shadow-xl border border-[#d0d4e4] z-[220] p-1"
+                                    ref={activeDropdownRef}
+                                    className="fixed z-[220] w-36 overflow-y-auto rounded-lg border border-[#d0d4e4] bg-white p-1 shadow-xl"
                                     style={{
                                       left: priorityDropdownAnchor.x,
                                       top: priorityDropdownAnchor.y,
-                                      transform: 'translateX(-50%)',
+                                      maxHeight: priorityDropdownAnchor.maxHeight,
+                                      transform: priorityDropdownAnchor.transform,
                                     }}
                                   >
                                     {/* No priority option */}
