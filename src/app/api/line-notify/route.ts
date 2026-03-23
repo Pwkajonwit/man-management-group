@@ -204,11 +204,11 @@ export async function POST(request: NextRequest) {
 
 function buildFlexMessage(payload: NotifyPayload): FlexMessage {
     const actionMeta: Record<NotifyAction, { title: string; badge: string; color: string }> = {
-        assigned: { title: 'แจ้งมอบหมายงานใหม่', badge: 'งานใหม่', color: '#1D4ED8' },
-        status_changed: { title: 'แจ้งเปลี่ยนสถานะงาน', badge: 'อัปเดต', color: '#0F766E' },
-        comment_added: { title: 'แจ้งความคิดเห็นใหม่', badge: 'ข้อความ', color: '#9A3412' },
-        deadline_warning: { title: 'งานใกล้ครบกำหนดส่ง', badge: 'ใกล้ส่ง', color: '#B45309' },
-        overdue: { title: 'งานเกินกำหนดเวลา', badge: 'ล่าช้า', color: '#B91C1C' },
+        assigned: { title: 'แจ้งมอบหมาย', badge: 'งานใหม่', color: '#1D4ED8' },
+        status_changed: { title: 'แจ้งเปลี่ยนสถานะ', badge: 'อัปเดต', color: '#0F766E' },
+        comment_added: { title: 'แจ้งความคิดเห็น', badge: 'ข้อความ', color: '#9A3412' },
+        deadline_warning: { title: 'ใกล้ครบกำหนดส่ง', badge: 'ใกล้ส่ง', color: '#B45309' },
+        overdue: { title: 'เกินกำหนดเวลา', badge: 'ล่าช้า', color: '#B91C1C' },
     };
     const statusLabels: Record<string, string> = {
         'not-started': 'ยังไม่เริ่ม',
