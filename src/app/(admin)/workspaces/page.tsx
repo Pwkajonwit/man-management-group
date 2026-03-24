@@ -91,6 +91,8 @@ export default function TaskBoardPage() {
   const [statusDropdownAnchor, setStatusDropdownAnchor] = useState<DropdownAnchor | null>(null);
   const [activePriorityDropdown, setActivePriorityDropdown] = useState<string | null>(null);
   const [priorityDropdownAnchor, setPriorityDropdownAnchor] = useState<DropdownAnchor | null>(null);
+  const [ownerSelectionDraft, setOwnerSelectionDraft] = useState<string[]>([]);
+  const [isSavingOwnerSelection, setIsSavingOwnerSelection] = useState(false);
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [taskUpdateText, setTaskUpdateText] = useState("");
@@ -106,6 +108,7 @@ export default function TaskBoardPage() {
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
   const [showProjectSettings, setShowProjectSettings] = useState(false);
   const [projectNameDraft, setProjectNameDraft] = useState('');
+  const [projectCodeDraft, setProjectCodeDraft] = useState('');
   const [projectStatusDraft, setProjectStatusDraft] = useState<Project['status']>('planning');
   const [projectBranchDraft, setProjectBranchDraft] = useState(DEFAULT_BRANCH_ID);
   const [projectDepartmentDraft, setProjectDepartmentDraft] = useState(DEFAULT_DEPARTMENT_ID);
@@ -129,6 +132,7 @@ export default function TaskBoardPage() {
     [tasks, activeProjectId]
   );
   const activeProjectName = activeProject?.name || '';
+  const activeProjectCode = activeProject?.code || '';
   const activeProjectStatus = activeProject?.status || 'planning';
   const activeProjectBranchId = (() => {
     const sourceBranchId = activeProject?.branchId || DEFAULT_BRANCH_ID;
@@ -158,6 +162,7 @@ export default function TaskBoardPage() {
   useEffect(() => {
     if (!activeProjectId) {
       setProjectNameDraft('');
+      setProjectCodeDraft('');
       setProjectStatusDraft('planning');
       setProjectBranchDraft(DEFAULT_BRANCH_ID);
       setProjectDepartmentDraft(DEFAULT_DEPARTMENT_ID);
@@ -165,24 +170,27 @@ export default function TaskBoardPage() {
       return;
     }
     setProjectNameDraft(activeProjectName);
+    setProjectCodeDraft(activeProjectCode);
     setProjectStatusDraft(activeProjectStatus);
     setProjectBranchDraft(activeProjectBranchId);
     setProjectDepartmentDraft(activeProjectDepartmentId);
-  }, [activeProjectDepartmentId, activeProjectBranchId, activeProjectId, activeProjectName, activeProjectStatus]);
+  }, [activeProjectCode, activeProjectDepartmentId, activeProjectBranchId, activeProjectId, activeProjectName, activeProjectStatus]);
 
   const projectSettingsChanged = useMemo(() => {
     if (!activeProject) return false;
     return (
       projectNameDraft.trim() !== activeProject.name ||
+      projectCodeDraft.trim() !== (activeProject.code || '') ||
       projectStatusDraft !== activeProject.status ||
       projectBranchDraft !== (activeProject.branchId || DEFAULT_BRANCH_ID) ||
       projectDepartmentDraft !== (activeProject.departmentId || DEFAULT_DEPARTMENT_ID)
     );
-  }, [activeProject, projectBranchDraft, projectDepartmentDraft, projectNameDraft, projectStatusDraft]);
+  }, [activeProject, projectBranchDraft, projectCodeDraft, projectDepartmentDraft, projectNameDraft, projectStatusDraft]);
 
   const handleSaveProjectSettings = useCallback(async () => {
     if (!activeProject) return;
     const trimmedName = projectNameDraft.trim();
+    const trimmedCode = projectCodeDraft.trim();
     if (!trimmedName) {
       void modal.alert('ต้องระบุชื่อโครงการ', { variant: 'warning' });
       return;
@@ -192,7 +200,7 @@ export default function TaskBoardPage() {
       await updateWorkspace(
         activeProject.id,
         trimmedName,
-        activeProject.code,
+        trimmedCode,
         projectStatusDraft,
         {
           branchId: projectBranchDraft,
@@ -206,7 +214,7 @@ export default function TaskBoardPage() {
     } finally {
       setSavingProjectSettings(false);
     }
-  }, [activeProject, modal, projectBranchDraft, projectDepartmentDraft, projectNameDraft, projectStatusDraft, updateWorkspace]);
+  }, [activeProject, modal, projectBranchDraft, projectCodeDraft, projectDepartmentDraft, projectNameDraft, projectStatusDraft, updateWorkspace]);
 
   const handleDeleteProject = useCallback(async () => {
     if (!activeProject || deletingProject) return;
@@ -502,6 +510,8 @@ export default function TaskBoardPage() {
     setStatusDropdownAnchor(null);
     setActivePriorityDropdown(null);
     setPriorityDropdownAnchor(null);
+    setOwnerSelectionDraft([]);
+    setIsSavingOwnerSelection(false);
   }, []);
 
   const getDropdownAnchor = useCallback((
@@ -536,10 +546,42 @@ export default function TaskBoardPage() {
       closeAllDropdowns();
       return;
     }
+
+    const task = projectTasks.find((item) => item.id === taskId);
+    const currentOwners = task ? getTaskOwnerNames(task) : [];
+
     closeAllDropdowns();
+    setOwnerSelectionDraft(currentOwners);
     setOwnerDropdownAnchor(getDropdownAnchor(anchorEl, 280, 320));
     setActiveOwnerDropdown(taskId);
   };
+
+  const handleConfirmOwnerSelection = useCallback(async (taskId: string) => {
+    if (isSavingOwnerSelection) return;
+
+    const task = projectTasks.find((item) => item.id === taskId);
+    if (!task) {
+      closeAllDropdowns();
+      return;
+    }
+
+    const nextOwners = Array.from(new Set(ownerSelectionDraft.map((owner) => owner.trim()).filter(Boolean)));
+    const currentOwners = getTaskOwnerNames(task);
+    const ownersChanged = nextOwners.length !== currentOwners.length
+      || nextOwners.some((owner, index) => owner !== currentOwners[index]);
+
+    try {
+      setIsSavingOwnerSelection(true);
+      if (ownersChanged) {
+        await Promise.resolve(handleUpdateTaskOwners(taskId, nextOwners));
+      }
+      closeAllDropdowns();
+    } catch (error) {
+      console.error('Failed to update task owners:', error);
+      void modal.error('ไม่สามารถอัปเดตผู้รับผิดชอบได้ โปรดลองอีกครั้ง');
+      setIsSavingOwnerSelection(false);
+    }
+  }, [closeAllDropdowns, getTaskOwnerNames, handleUpdateTaskOwners, isSavingOwnerSelection, modal, ownerSelectionDraft, projectTasks]);
 
   const toggleStatusDropdown = (taskId: string, anchorEl: HTMLDivElement) => {
     if (activeStatusDropdown === taskId) {
@@ -969,6 +1011,16 @@ export default function TaskBoardPage() {
                       />
                     </div>
                     <div className="grid gap-1.5 sm:grid-cols-[88px_minmax(0,1fr)] sm:items-center sm:gap-3">
+                      <label className="text-[12px] font-medium text-[#495d71]">เลขที่โครงการ</label>
+                      <input
+                        type="text"
+                        value={projectCodeDraft}
+                        onChange={(e) => setProjectCodeDraft(e.target.value)}
+                        placeholder="เลขที่โครงการ"
+                        className="w-full rounded-lg border border-[#c4cede] bg-white px-3 py-1.5 text-[13px] text-[#233548] outline-none focus:border-[#0073ea] focus:ring-2 focus:ring-[#0073ea]/20"
+                      />
+                    </div>
+                    <div className="grid gap-1.5 sm:grid-cols-[88px_minmax(0,1fr)] sm:items-center sm:gap-3">
                       <label className="text-[12px] font-medium text-[#495d71]">สถานะโครงการ</label>
                       <select
                         value={projectStatusDraft}
@@ -1044,6 +1096,7 @@ export default function TaskBoardPage() {
                   type="button"
                   onClick={() => {
                     setProjectNameDraft(activeProject.name);
+                    setProjectCodeDraft(activeProject.code || '');
                     setProjectStatusDraft(activeProject.status);
                     setProjectBranchDraft(activeProjectBranchId);
                     setProjectDepartmentDraft(activeProjectDepartmentId);
@@ -1500,14 +1553,14 @@ export default function TaskBoardPage() {
                                       <button
                                         type="button"
                                         className="mx-3 mb-2 flex h-10 w-10 items-center justify-center rounded-full border border-dashed border-[#c7cedb] bg-[#f5f6f8] text-[#676879] transition-colors hover:border-[#0073ea] hover:text-[#0073ea]"
-                                        onClick={() => { handleUpdateTaskOwners(task.id, []); }}
+                                        onClick={() => { setOwnerSelectionDraft([]); }}
                                         title={'\u0e44\u0e21\u0e48\u0e44\u0e14\u0e49\u0e01\u0e33\u0e2b\u0e19\u0e14\u0e1c\u0e39\u0e49\u0e23\u0e31\u0e1a\u0e1c\u0e34\u0e14\u0e0a\u0e2d\u0e1a'}
                                       >
                                         <X className="h-4 w-4" />
                                       </button>
                                       <div className="grid grid-cols-5 gap-2 px-3 pb-2">
                                         {teamMembers.map(member => {
-                                          const isSelected = ownerNames.includes(member.name);
+                                          const isSelected = ownerSelectionDraft.includes(member.name);
                                           return (
                                             <button
                                               key={member.id}
@@ -1515,9 +1568,9 @@ export default function TaskBoardPage() {
                                               className={`relative flex h-11 w-11 items-center justify-center rounded-full transition-all ${isSelected ? 'ring-2 ring-[#0073ea] ring-offset-2 ring-offset-white' : 'hover:scale-105'}`}
                                               onClick={() => {
                                                 const nextOwners = isSelected
-                                                  ? ownerNames.filter((owner) => owner !== member.name)
-                                                  : [...ownerNames, member.name];
-                                                handleUpdateTaskOwners(task.id, nextOwners);
+                                                  ? ownerSelectionDraft.filter((owner) => owner !== member.name)
+                                                  : [...ownerSelectionDraft, member.name];
+                                                setOwnerSelectionDraft(nextOwners);
                                               }}
                                               title={member.name}
                                             >
@@ -1543,12 +1596,13 @@ export default function TaskBoardPage() {
                                       </div>
                                     </div>
                                     <div className="px-3 pt-2 mt-1 border-t border-[#e6e9ef] flex items-center justify-between">
-                                      <span className="text-[11px] text-[#676879]">{ownerNames.length} รายการที่เลือก</span>
+                                      <span className="text-[11px] text-[#676879]">{ownerSelectionDraft.length} รายการที่เลือก</span>
                                       <button
-                                        onClick={closeAllDropdowns}
-                                        className="text-[11px] px-2 py-1 rounded bg-[#f5f6f8] hover:bg-[#e6e9ef] text-[#323338]"
+                                        onClick={() => void handleConfirmOwnerSelection(task.id)}
+                                        disabled={isSavingOwnerSelection}
+                                        className="text-[11px] px-2 py-1 rounded bg-[#f5f6f8] hover:bg-[#e6e9ef] text-[#323338] disabled:opacity-60"
                                       >
-                                        เสร็จสิ้น
+                                        {isSavingOwnerSelection ? 'กำลังบันทึก...' : 'เสร็จสิ้น'}
                                       </button>
                                     </div>
                                   </div>,
@@ -1800,3 +1854,6 @@ export default function TaskBoardPage() {
     </div>
   );
 }
+
+
+
