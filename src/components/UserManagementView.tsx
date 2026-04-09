@@ -84,7 +84,7 @@ export default function UserManagementView({
     const [newMemberBranchId, setNewMemberBranchId] = useState('');
     const [newMemberDepartmentId, setNewMemberDepartmentId] = useState('');
     const [newMemberPhone, setNewMemberPhone] = useState('');
-    const [newMemberCapacity, setNewMemberCapacity] = useState('40');
+    const [newMemberCapacity, setNewMemberCapacity] = useState('48');
     const [newMemberType, setNewMemberType] = useState<MemberType>('team');
     const [newMemberAvatar, setNewMemberAvatar] = useState('');
 
@@ -310,7 +310,7 @@ export default function UserManagementView({
             position: branchLabel,
             department: departmentLabel,
             phone: newMemberPhone.trim() || '-',
-            capacityHoursPerWeek: Number.parseInt(newMemberCapacity, 10) || 40,
+            capacityHoursPerWeek: Number.parseInt(newMemberCapacity, 10) || 48,
             avatar: newMemberAvatar || undefined,
         };
 
@@ -319,7 +319,7 @@ export default function UserManagementView({
         setNewMemberBranchId(branchOptions[0]?.id || '');
         setNewMemberDepartmentId('');
         setNewMemberPhone('');
-        setNewMemberCapacity('40');
+        setNewMemberCapacity('48');
         setNewMemberType('team');
         setNewMemberAvatar('');
     };

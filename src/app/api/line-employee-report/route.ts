@@ -334,7 +334,7 @@ function groupTasksByProject(tasks: EmployeeReportPayload['tasks']) {
 function buildFlexMessage(payload: EmployeeReportPayload) {
     const groupedProjectTasks = groupTasksByProject(payload.tasks);
     const multiProjectMode = groupedProjectTasks.length > 1;
-    const generatedAt = new Date().toLocaleString('en-GB', { hour12: false });
+    const generatedAt = new Date().toLocaleString('th-TH', { hour12: false });
     const summaryCards: FlexBoxNode[] = [
         {
             type: 'box',
@@ -469,7 +469,7 @@ function buildFlexMessage(payload: EmployeeReportPayload) {
         } else {
             bodyContents.push({
                 type: 'text',
-                text: '\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e07\u0e32\u0e19\u0e2b\u0e25\u0e31\u0e01',
+                text: 'รายการงานหลัก',
                 size: 'sm',
                 weight: 'bold',
                 color: '#374151',

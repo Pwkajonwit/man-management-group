@@ -198,14 +198,15 @@ async function sendLineNotify(payload: {
     timeline?: string;
     priority?: string;
 }) {
-    try {
-        await fetch('/api/line-notify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
-    } catch (err) {
-        console.error('LINE notify failed (non-blocking):', err);
+    const response = await fetch('/api/line-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        const data = await response.json().catch(() => null) as { error?: string } | null;
+        throw new Error(data?.error || 'ไม่สามารถส่งการแจ้งเตือน LINE ได้');
     }
 }
 
@@ -777,18 +778,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (ownerNames.length === 0) return;
 
         const project = projects.find(p => p.id === task.projectId);
-        ownerNames.forEach((ownerName) => {
-            const member = teamMembers.find(m => m.name === ownerName);
-            if (!member?.lineUserId) return;
-            sendLineNotify({
-                to: member.lineUserId,
-                taskId: task.id,
-                taskName: task.name,
-                action: 'comment_added',
-                projectName: project?.name,
-                comment: trimmedText,
-            });
-        });
+        try {
+            await Promise.all(
+                ownerNames.map(async (ownerName) => {
+                    const member = teamMembers.find(m => m.name === ownerName);
+                    if (!member?.lineUserId) return;
+                    await sendLineNotify({
+                        to: member.lineUserId,
+                        taskId: task.id,
+                        taskName: task.name,
+                        action: 'comment_added',
+                        projectName: project?.name,
+                        comment: trimmedText,
+                    });
+                })
+            );
+        } catch (error) {
+            console.error('Failed to send LINE comment notification:', error);
+        }
     }, [currentUserName, dataSource, tasks, teamMembers, projects, notificationSettings.notifyTaskCommentAdded]);
 
     const resolveWriteScope = useCallback((projectId?: string) => {
@@ -997,39 +1004,57 @@ export function AppProvider({ children }: { children: ReactNode }) {
             );
         }
 
-        if (task) {
-            const newlyAssignedOwners = normalizedOwners.filter(owner => !previousOwners.includes(owner));
-            if (notificationSettings.notifyTaskAssigned && newlyAssignedOwners.length > 0) {
-                const project = projects.find(p => p.id === task.projectId);
-                const crewNames = normalizedOwners.filter(ownerName => ownerName !== primaryOwner);
-                newlyAssignedOwners.forEach((ownerName) => {
-                    const member = teamMembers.find(m => m.name === ownerName);
-                    if (!member?.lineUserId) return;
-                    sendLineNotify({
-                        to: member.lineUserId,
-                        taskId: task.id,
-                        taskName: task.name,
-                        action: 'assigned',
-                        assignedBy: 'System Admin',
-                        projectName: project?.name,
-                        owner: primaryOwner || 'Unassigned',
-                        crew: crewNames.join(', ') || undefined,
-                        timeline: `${task.planStartDate || '-'} - ${task.planEndDate || '-'}`,
-                        priority: task.priority || '-',
-                    });
-                });
-            }
-        }
-
         updateTaskInState(taskId, (task) => ({
             ...task,
             responsible: primaryOwner,
             assignedEmployeeIds: nextAssignedEmployeeIds,
         }));
-        if (dataSource === 'firebase') {
-            await fbUpdateTask(taskId, { responsible: primaryOwner, assignedEmployeeIds: nextAssignedEmployeeIds });
+
+        try {
+            if (dataSource === 'firebase') {
+                await fbUpdateTask(taskId, { responsible: primaryOwner, assignedEmployeeIds: nextAssignedEmployeeIds });
+            }
+        } catch (error) {
+            console.error('Failed to update task owners:', error);
+            updateTaskInState(taskId, (currentTask) => ({
+                ...currentTask,
+                responsible: task?.responsible || '',
+                assignedEmployeeIds: task?.assignedEmployeeIds || [],
+            }));
+            throw error;
         }
-    }, [tasks, teamMembers, projects, dataSource, logActivity, notificationSettings.notifyTaskAssigned, updateTaskInState]);
+
+        if (task) {
+            const newlyAssignedOwners = normalizedOwners.filter(owner => !previousOwners.includes(owner));
+            if (notificationSettings.notifyTaskAssigned && newlyAssignedOwners.length > 0) {
+                const project = projects.find(p => p.id === task.projectId);
+                const crewNames = normalizedOwners.filter(ownerName => ownerName !== primaryOwner);
+
+                try {
+                    await Promise.all(
+                        newlyAssignedOwners.map(async (ownerName) => {
+                            const member = teamMembers.find(m => m.name === ownerName);
+                            if (!member?.lineUserId) return;
+                            await sendLineNotify({
+                                to: member.lineUserId,
+                                taskId: task.id,
+                                taskName: task.name,
+                                action: 'assigned',
+                                assignedBy: currentUserName,
+                                projectName: project?.name,
+                                owner: primaryOwner || 'ยังไม่ระบุ',
+                                crew: crewNames.join(', ') || undefined,
+                                timeline: `${task.planStartDate || '-'} - ${task.planEndDate || '-'}`,
+                                priority: task.priority || '-',
+                            });
+                        })
+                    );
+                } catch (error) {
+                    console.error('Failed to send LINE assignment notification:', error);
+                }
+            }
+        }
+    }, [currentUserName, tasks, teamMembers, projects, dataSource, logActivity, notificationSettings.notifyTaskAssigned, updateTaskInState]);
 
     const handleUpdateTaskOwner = useCallback((taskId: string, newOwner: string) => {
         void handleUpdateTaskOwners(taskId, newOwner ? [newOwner] : []);
@@ -1040,26 +1065,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (task && task.status !== newStatus) {
             logActivity(taskId, 'status_changed', 'status', task.status, newStatus);
 
-            if (notificationSettings.notifyTaskStatusChanged) {
-                // LINE Notify on status change
-                const ownerNames = Array.from(new Set([
-                    ...((task.assignedEmployeeIds || []).map(ownerId => teamMembers.find(m => m.id === ownerId)?.name).filter((name): name is string => Boolean(name))),
-                    ...(task.responsible ? [task.responsible] : []),
-                ]));
-                const project = projects.find(p => p.id === task.projectId);
-                ownerNames.forEach((ownerName) => {
-                    const member = teamMembers.find(m => m.name === ownerName);
-                    if (!member?.lineUserId) return;
-                    sendLineNotify({
-                        to: member.lineUserId,
-                        taskId: task.id,
-                        taskName: task.name,
-                        action: 'status_changed',
-                        newStatus,
-                        projectName: project?.name,
-                    });
-                });
-            }
         }
 
         const shouldForceCompletedProgress = newStatus === 'completed';
@@ -1069,12 +1074,51 @@ export function AppProvider({ children }: { children: ReactNode }) {
             ...(shouldForceCompletedProgress ? { progress: 100 } : {}),
         }));
 
-        if (dataSource === 'firebase') {
-            const statusPatch: Partial<Task> = { status: newStatus };
-            if (shouldForceCompletedProgress) {
-                statusPatch.progress = 100;
+        try {
+            if (dataSource === 'firebase') {
+                const statusPatch: Partial<Task> = { status: newStatus };
+                if (shouldForceCompletedProgress) {
+                    statusPatch.progress = 100;
+                }
+                await fbUpdateTask(taskId, statusPatch);
             }
-            await fbUpdateTask(taskId, statusPatch);
+        } catch (error) {
+            console.error('Failed to update task status:', error);
+            if (task) {
+                updateTaskInState(taskId, (currentTask) => ({
+                    ...currentTask,
+                    status: task.status,
+                    progress: task.progress,
+                }));
+            }
+            throw error;
+        }
+
+        if (task && notificationSettings.notifyTaskStatusChanged) {
+            const ownerNames = Array.from(new Set([
+                ...((task.assignedEmployeeIds || []).map(ownerId => teamMembers.find(m => m.id === ownerId)?.name).filter((name): name is string => Boolean(name))),
+                ...(task.responsible ? [task.responsible] : []),
+            ]));
+            const project = projects.find(p => p.id === task.projectId);
+
+            try {
+                await Promise.all(
+                    ownerNames.map(async (ownerName) => {
+                        const member = teamMembers.find(m => m.name === ownerName);
+                        if (!member?.lineUserId) return;
+                        await sendLineNotify({
+                            to: member.lineUserId,
+                            taskId: task.id,
+                            taskName: task.name,
+                            action: 'status_changed',
+                            newStatus,
+                            projectName: project?.name,
+                        });
+                    })
+                );
+            } catch (error) {
+                console.error('Failed to send LINE status notification:', error);
+            }
         }
     }, [tasks, teamMembers, projects, dataSource, logActivity, notificationSettings.notifyTaskStatusChanged, updateTaskInState]);
 

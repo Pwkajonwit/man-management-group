@@ -153,7 +153,7 @@ export default function SettingsPage() {
             await updateNotificationSettings({
                 lineAdminUserId: lineAdminUserIdDraft.trim(),
                 lineReportType: lineReportTypeDraft,
-                employeeReportEnabled,
+                employeeReportEnabled: false,
                 employeeReportFrequency,
                 employeeReportDayOfWeek,
                 employeeReportTime,
@@ -451,8 +451,12 @@ export default function SettingsPage() {
                                 การตั้งค่ารายงานพนักงาน
                             </div>
 
+                            <div className="rounded-lg border border-[#ffe1b3] bg-[#fff7e6] px-3 py-2 text-[12px] text-[#8a5a00]">
+                                ระบบส่งรายงานพนักงานอัตโนมัติยังไม่เปิดใช้งานในเวอร์ชันนี้ ขณะนี้รองรับการส่งรายงานทดสอบด้วยตนเองเท่านั้น เพื่อป้องกันการตั้งค่าคลาดเคลื่อน ระบบจะไม่บันทึกสถานะ &quot;เปิดใช้งานรายงานพนักงาน&quot; เป็นอัตโนมัติ
+                            </div>
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                {renderSwitch(employeeReportEnabled, setEmployeeReportEnabled, 'เปิดใช้งานรายงานพนักงาน', 'อนุญาตให้ส่งรายงานภาระงานส่วนบุคคล')}
+                                {renderSwitch(false, () => undefined, 'รายงานพนักงานอัตโนมัติ', 'ยังไม่พร้อมใช้งานในระบบจริง')}
                                 {renderSwitch(employeeReportIncludeTaskList, setEmployeeReportIncludeTaskList, 'รวมรายชื่อส่วนการทำงาน', 'รวมรายการงานหลักลงในรายงาน')}
                             </div>
 
@@ -460,7 +464,8 @@ export default function SettingsPage() {
                                 <select
                                     value={employeeReportFrequency}
                                     onChange={(e) => setEmployeeReportFrequency(e.target.value as 'daily' | 'weekly')}
-                                    className="h-10 px-3 border border-[#d0d4e4] rounded-lg text-[13px] outline-none bg-white"
+                                    disabled
+                                    className="h-10 px-3 border border-[#d0d4e4] rounded-lg text-[13px] outline-none bg-white disabled:opacity-60"
                                 >
                                     <option value="daily">ความถี่: รายวัน</option>
                                     <option value="weekly">ความถี่: รายสัปดาห์</option>
@@ -468,7 +473,7 @@ export default function SettingsPage() {
                                 <select
                                     value={employeeReportDayOfWeek}
                                     onChange={(e) => setEmployeeReportDayOfWeek(e.target.value as (typeof dayOptions)[number])}
-                                    disabled={employeeReportFrequency !== 'weekly'}
+                                    disabled
                                     className="h-10 px-3 border border-[#d0d4e4] rounded-lg text-[13px] outline-none bg-white disabled:opacity-60"
                                 >
                                     {dayOptions.map((day) => (
@@ -481,7 +486,8 @@ export default function SettingsPage() {
                                         type="time"
                                         value={employeeReportTime}
                                         onChange={(e) => setEmployeeReportTime(e.target.value)}
-                                        className="h-10 w-full pl-9 pr-3 border border-[#d0d4e4] rounded-lg text-[13px] outline-none"
+                                        disabled
+                                        className="h-10 w-full pl-9 pr-3 border border-[#d0d4e4] rounded-lg text-[13px] outline-none disabled:opacity-60"
                                     />
                                 </div>
                                 <select
@@ -601,7 +607,7 @@ export default function SettingsPage() {
                             </button>
 
                             <div className="text-[11px] text-[#9ca3af]">
-                                โหมดทดสอบจะส่งไปยังสมาชิกที่เลือกเท่านั้นและไม่ต้องการระบบอัตโนมัติ
+                                โหมดทดสอบจะส่งไปยังสมาชิกที่เลือกเท่านั้น และเป็นช่องทางที่รองรับจริงในเวอร์ชันปัจจุบัน
                             </div>
                         </div>
 

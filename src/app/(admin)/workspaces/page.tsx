@@ -101,7 +101,7 @@ export default function TaskBoardPage() {
   const [isSendingLineReport, setIsSendingLineReport] = useState(false);
   const [pendingAddCategory, setPendingAddCategory] = useState<string | null>(null);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
-  const [manualCategories, setManualCategories] = useState<string[]>([]);
+  const [manualCategoriesByProject, setManualCategoriesByProject] = useState<Record<string, string[]>>({});
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [hideCompletedTasks, setHideCompletedTasks] = useState(true);
@@ -127,9 +127,14 @@ export default function TaskBoardPage() {
   const activeDropdownRef = useRef<HTMLDivElement | null>(null);
 
   const activeProject = projects.find(p => p.id === activeProjectId);
+  const currentProjectId = activeProject?.id || activeProjectId || null;
   const projectTasks = useMemo(
-    () => tasks.filter((task) => task.projectId === activeProjectId),
-    [tasks, activeProjectId]
+    () => tasks.filter((task) => task.projectId === currentProjectId),
+    [tasks, currentProjectId]
+  );
+  const manualCategories = useMemo(
+    () => (currentProjectId ? manualCategoriesByProject[currentProjectId] || [] : []),
+    [currentProjectId, manualCategoriesByProject]
   );
   const activeProjectName = activeProject?.name || '';
   const activeProjectCode = activeProject?.code || '';
@@ -477,7 +482,7 @@ export default function TaskBoardPage() {
     setSortBy('default');
   };
 
-  const handleCreateCategory = () => {
+  const handleCreateCategory = useCallback(() => {
     const categoryName = newCategoryName.trim();
     if (!categoryName) return;
 
@@ -492,10 +497,18 @@ export default function TaskBoardPage() {
       return;
     }
 
-    setManualCategories((prev) => [...prev, categoryName]);
+    if (!currentProjectId) {
+      void modal.alert('ยังไม่พบพื้นที่ทำงานที่กำลังใช้งานอยู่', { variant: 'warning' });
+      return;
+    }
+
+    setManualCategoriesByProject((prev) => ({
+      ...prev,
+      [currentProjectId]: [...(prev[currentProjectId] || []), categoryName],
+    }));
     setNewCategoryName('');
     setIsAddingCategory(false);
-  };
+  }, [currentProjectId, manualCategories, modal, newCategoryName, projectTasks]);
 
   const handleAddUpdate = async () => {
     if (!selectedTask || taskUpdateText.trim() === "") return;
@@ -1364,7 +1377,7 @@ export default function TaskBoardPage() {
                       onClick={handleCreateCategory}
                       className="h-9 px-3 text-[13px] rounded-lg bg-[#0073ea] text-white hover:bg-[#0060c0]"
                     >
-                      Add
+                      เพิ่ม
                     </button>
                     <button
                       type="button"
@@ -1374,7 +1387,7 @@ export default function TaskBoardPage() {
                       }}
                       className="h-9 px-3 text-[13px] rounded-lg bg-[#f5f6f8] text-[#323338] hover:bg-[#e6e9ef]"
                     >
-                      Cancel
+                      ยกเลิก
                     </button>
                   </div>
                 )}
@@ -1854,6 +1867,3 @@ export default function TaskBoardPage() {
     </div>
   );
 }
-
-
-
