@@ -320,7 +320,7 @@ function buildFlexMessage(payload: ReportPayload): FlexMessage {
             backgroundColor: '#FFFFFF',
             cornerRadius: '10px',
             contents: [
-                { type: 'text', text: `เมื่อวาน (${digest?.yesterdayDate || '-'}) : ${digest?.yesterdayDone ?? 0}`, size: 'sm', weight: 'bold', color: '#0F172A' },
+                { type: 'text', text: `พรุ่งนี้ (${digest?.yesterdayDate || '-'}) : ${digest?.yesterdayDone ?? 0}`, size: 'sm', weight: 'bold', color: '#0F172A' },
                 ...(yesterdayTasks.length > 0
                     ? yesterdayTasks.map((taskName) => ({
                         type: 'text' as const,

@@ -440,7 +440,7 @@ export default function SettingsPage() {
                                 >
                                     <option value="project-summary">สรุปโครงการ</option>
                                     <option value="today-team-load">ภาระงานทีมวันนี้</option>
-                                    <option value="completed-last-2-days">เสร็จสิ้น (วันนี้ + เมื่อวาน)</option>
+                                    <option value="completed-last-2-days">เสร็จสิ้น (วันนี้ + พรุ่งนี้)</option>
                                 </select>
                             </div>
                         </div>

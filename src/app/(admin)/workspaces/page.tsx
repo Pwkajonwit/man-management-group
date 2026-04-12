@@ -369,7 +369,7 @@ export default function TaskBoardPage() {
 
     const today = new Date();
     const todayKey = format(today, 'yyyy-MM-dd');
-    const yesterdayKey = format(addDays(today, -1), 'yyyy-MM-dd');
+    const tomorrowKey = format(addDays(today, 1), 'yyyy-MM-dd');
     const visibleLimit = 8;
 
     const completedTasks = projectTasks.filter((task) => task.status === 'completed');
@@ -379,8 +379,8 @@ export default function TaskBoardPage() {
     const todayCompleted = toSortedItems(
       completedTasks.filter((task) => toLocalDateKey(task.updatedAt) === todayKey)
     );
-    const yesterdayCompleted = toSortedItems(
-      completedTasks.filter((task) => toLocalDateKey(task.updatedAt) === yesterdayKey)
+    const tomorrowCompleted = toSortedItems(
+      completedTasks.filter((task) => toLocalDateKey(task.updatedAt) === tomorrowKey)
     );
 
     const mapDocumentItems = (items: Task[]) =>
@@ -397,14 +397,14 @@ export default function TaskBoardPage() {
 
     return {
       todayDateLabel: format(today, 'dd/MM/yyyy'),
-      yesterdayDateLabel: format(addDays(today, -1), 'dd/MM/yyyy'),
+      tomorrowDateLabel: format(addDays(today, 1), 'dd/MM/yyyy'),
       todayDoneCount: todayCompleted.length,
-      yesterdayDoneCount: yesterdayCompleted.length,
+      tomorrowDoneCount: tomorrowCompleted.length,
       totalCompletedCount: completedTasks.length,
       todayItems: mapDocumentItems(todayCompleted),
-      yesterdayItems: mapDocumentItems(yesterdayCompleted),
+      tomorrowItems: mapDocumentItems(tomorrowCompleted),
       todayMoreCount: Math.max(todayCompleted.length - visibleLimit, 0),
-      yesterdayMoreCount: Math.max(yesterdayCompleted.length - visibleLimit, 0),
+      tomorrowMoreCount: Math.max(tomorrowCompleted.length - visibleLimit, 0),
     };
   }, [projectTasks, assignmentByTaskId]);
 
@@ -724,17 +724,17 @@ export default function TaskBoardPage() {
           teamLoad,
           completedDigest: {
             todayDate: twoDayCompletionReport.todayDateLabel,
-            yesterdayDate: twoDayCompletionReport.yesterdayDateLabel,
+            yesterdayDate: twoDayCompletionReport.tomorrowDateLabel,
             todayDone: twoDayCompletionReport.todayDoneCount,
-            yesterdayDone: twoDayCompletionReport.yesterdayDoneCount,
+            yesterdayDone: twoDayCompletionReport.tomorrowDoneCount,
             todayTasks: twoDayCompletionReport.todayItems.map(
               (item) => `${item.name} (Owner: ${item.ownerLabel})`
             ),
-            yesterdayTasks: twoDayCompletionReport.yesterdayItems.map(
+            yesterdayTasks: twoDayCompletionReport.tomorrowItems.map(
               (item) => `${item.name} (Owner: ${item.ownerLabel})`
             ),
             todayMore: twoDayCompletionReport.todayMoreCount,
-            yesterdayMore: twoDayCompletionReport.yesterdayMoreCount,
+            yesterdayMore: twoDayCompletionReport.tomorrowMoreCount,
           },
           metrics: {
             totalTasks: projectTasks.length,

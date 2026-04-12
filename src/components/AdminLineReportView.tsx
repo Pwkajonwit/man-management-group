@@ -146,24 +146,24 @@ export default function AdminLineReportView({
     const completedDigest = useMemo(() => {
         const today = new Date();
         const todayKey = format(today, 'yyyy-MM-dd');
-        const yesterdayKey = format(addDays(today, -1), 'yyyy-MM-dd');
+        const tomorrowKey = format(addDays(today, 1), 'yyyy-MM-dd');
         const completedTasks = projectTasks.filter((task) => task.status === 'completed');
         const sortByUpdated = (items: Task[]) =>
             [...items].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
         const todayItems = sortByUpdated(completedTasks.filter((task) => toDateKey(task.updatedAt) === todayKey));
-        const yesterdayItems = sortByUpdated(completedTasks.filter((task) => toDateKey(task.updatedAt) === yesterdayKey));
+        const tomorrowItems = sortByUpdated(completedTasks.filter((task) => toDateKey(task.updatedAt) === tomorrowKey));
 
         return {
             todayDateLabel: format(today, 'dd/MM/yyyy'),
-            yesterdayDateLabel: format(addDays(today, -1), 'dd/MM/yyyy'),
+            tomorrowDateLabel: format(addDays(today, 1), 'dd/MM/yyyy'),
             todayItems: todayItems.map((task) => ({
                 id: task.id,
                 name: task.name,
                 ownerLabel: (assignmentByTaskId.get(task.id) || []).join(', ') || 'Unassigned',
                 timeLabel: toTimeLabel(task.updatedAt),
             })),
-            yesterdayItems: yesterdayItems.map((task) => ({
+            tomorrowItems: tomorrowItems.map((task) => ({
                 id: task.id,
                 name: task.name,
                 ownerLabel: (assignmentByTaskId.get(task.id) || []).join(', ') || 'Unassigned',
@@ -320,7 +320,7 @@ export default function AdminLineReportView({
                                 Completed Work Summary
                             </h2>
                             <p className="text-[12px] text-[#5f7084] mt-1">
-                                {completedDigest.todayDateLabel} and {completedDigest.yesterdayDateLabel}
+                                {completedDigest.todayDateLabel} and {completedDigest.tomorrowDateLabel}
                             </p>
                         </div>
 
@@ -352,15 +352,15 @@ export default function AdminLineReportView({
                             <article className="rounded-xl border border-[#d6deea] bg-white p-3.5 shadow-[0_4px_12px_rgba(20,40,70,0.06)]">
                                 <h3 className="text-[13px] font-semibold text-[#1f3147] flex items-center gap-1.5">
                                     <Clock3 className="h-4 w-4 text-[#9a3412]" />
-                                    Yesterday ({completedDigest.yesterdayDateLabel}) - {completedDigest.yesterdayItems.length}
+                                    Tomorrow ({completedDigest.tomorrowDateLabel}) - {completedDigest.tomorrowItems.length}
                                 </h3>
                                 <div className="mt-2 space-y-2">
-                                    {completedDigest.yesterdayItems.length === 0 && (
+                                    {completedDigest.tomorrowItems.length === 0 && (
                                         <div className="rounded-lg border border-[#d6deea] bg-[#f8fbff] px-3 py-2 text-[12px] text-[#5f7084]">
                                             No completed tasks
                                         </div>
                                     )}
-                                    {completedDigest.yesterdayItems.map((item) => (
+                                    {completedDigest.tomorrowItems.map((item) => (
                                         <div key={item.id} className="rounded-lg border border-[#d6deea] bg-[#f8fbff] px-3 py-2">
                                             <div className="text-[12px] font-semibold text-[#1f3147] break-words [overflow-wrap:anywhere]">
                                                 {item.name}
@@ -426,4 +426,3 @@ export default function AdminLineReportView({
         </div>
     );
 }
-

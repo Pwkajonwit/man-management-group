@@ -79,35 +79,43 @@ const getStatusBadgeClass = (status: Task['status']) => {
 function ReportTable({ title, rows }: { title: string; rows: ReportRow[] }) {
   return (
     <section className="border border-[#cfd8e6] rounded-lg overflow-hidden bg-white">
-      <div className="px-4 py-2.5 bg-[#f2f6fb] border-b border-[#d8e2ee]">
-        <h2 className="text-[14px] font-semibold text-[#1f3147]">{title}</h2>
+      <div className="px-4 py-2 bg-[#eef3f9] border-b border-[#d3ddea]">
+        <h2 className="text-[13px] font-bold text-[#16283d]">{title}</h2>
       </div>
       {rows.length === 0 ? (
-        <div className="px-4 py-4 text-[13px] text-[#5f7084]">ไม่มีงานในช่วงเวลานี้</div>
+        <div className="px-4 py-4 text-[12px] text-[#5f7084]">ไม่มีงานในช่วงเวลานี้</div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-[13px] table-fixed">
-            <thead className="bg-[#14365a]">
+        <div className="overflow-x-auto report-table-wrap">
+          <table className="w-full min-w-[960px] text-[12px] report-table">
+            <colgroup>
+              <col className="w-[52px]" />
+              <col className="w-[110px]" />
+              <col className="w-[320px]" />
+              <col className="w-[170px]" />
+              <col className="w-[138px]" />
+              <col className="w-[118px]" />
+            </colgroup>
+            <thead className="bg-[#e8eef6]">
               <tr>
-                <th className="px-3 py-2 text-left font-semibold text-white/95 w-[56px]">ลำดับ</th>
-                <th className="px-3 py-2 text-left font-semibold text-white/95 w-[140px]">หมวดหมู่</th>
-                <th className="px-3 py-2 text-left font-semibold text-white/95">งาน</th>
-                <th className="px-3 py-2 text-left font-semibold text-white/95 w-[180px]">
+                <th className="px-2.5 py-2.5 text-left font-bold text-[#23364d] border-b border-[#cfd9e6]">ลำดับ</th>
+                <th className="px-2.5 py-2.5 text-left font-bold text-[#23364d] border-b border-[#cfd9e6]">หมวดหมู่</th>
+                <th className="px-3 py-2.5 text-left font-bold text-[#23364d] border-b border-[#cfd9e6]">งาน</th>
+                <th className="px-2.5 py-2.5 text-left font-bold text-[#23364d] border-b border-[#cfd9e6]">
                   <div className="flex flex-col leading-[1.2]">
                     <span>ผู้รับผิดชอบ</span>
-                    <span className="mt-1 text-white/80">ทีมช่าง</span>
+                    <span className="mt-1 text-[#5f7084] font-semibold">ทีมช่าง</span>
                   </div>
                 </th>
-                <th className="px-3 py-2 text-left font-semibold text-white/95 w-[150px]">
+                <th className="px-2.5 py-2.5 text-left font-bold text-[#23364d] border-b border-[#cfd9e6]">
                   <div className="flex flex-col leading-[1.2]">
                     <span>วันที่เริ่ม</span>
-                    <span className="mt-1 text-white/80">วันที่สิ้นสุด</span>
+                    <span className="mt-1 text-[#5f7084] font-semibold">วันที่สิ้นสุด</span>
                   </div>
                 </th>
-                <th className="px-3 py-2 text-left font-semibold text-white/95 w-[140px]">
+                <th className="px-2.5 py-2.5 text-left font-bold text-[#23364d] border-b border-[#cfd9e6]">
                   <div className="flex flex-col leading-[1.2]">
                     <span>สถานะ</span>
-                    <span className="mt-1 text-white/80">ความสำคัญ</span>
+                    <span className="mt-1 text-[#5f7084] font-semibold">ความสำคัญ</span>
                   </div>
                 </th>
               </tr>
@@ -115,27 +123,27 @@ function ReportTable({ title, rows }: { title: string; rows: ReportRow[] }) {
             <tbody>
               {rows.map((row, index) => (
                 <tr key={row.id} className={`border-b border-[#e6ecf3] last:border-b-0 ${index % 2 === 0 ? 'bg-white' : 'bg-[#fbfdff]'}`}>
-                  <td className="px-3 py-2 text-[#5f7084]">{index + 1}</td>
-                  <td className="px-3 py-2 text-[#5f7084] break-words">{row.category}</td>
-                  <td className="px-3 py-2 text-[#1f3147] break-words leading-relaxed">{row.name}</td>
-                  <td className="px-3 py-2">
+                  <td className="px-2.5 py-1.5 text-[#5f7084] align-top">{index + 1}</td>
+                  <td className="px-2.5 py-1.5 text-[#5f7084] whitespace-normal break-normal [overflow-wrap:anywhere] align-top">{row.category}</td>
+                  <td className="px-3 py-1.5 text-[#1f3147] whitespace-normal break-normal [overflow-wrap:anywhere] leading-relaxed align-top">{row.name}</td>
+                  <td className="px-2.5 py-1.5 align-top">
                     <div className="flex flex-col gap-1.5">
-                      <div className="text-[#5f7084] break-words">{row.ownerLabel}</div>
-                      <div className="text-[#5f7084] break-words">{row.crewLabel}</div>
+                      <div className="text-[#435468] whitespace-normal break-normal [overflow-wrap:anywhere]">{row.ownerLabel}</div>
+                      <div className="text-[#66788d] whitespace-normal break-normal [overflow-wrap:anywhere]">{row.crewLabel}</div>
                     </div>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-2.5 py-1.5 align-top">
                     <div className="flex flex-col gap-1.5">
                       <div className="text-[#1f3147]">{row.startDateLabel}</div>
                       <div className="text-[#1f3147]">{row.endDateLabel}</div>
                     </div>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-2.5 py-1.5 align-top">
                     <div className="flex flex-col gap-1.5">
-                      <span className={`inline-flex w-fit items-center px-2 py-1 rounded text-[11px] font-semibold border whitespace-nowrap ${getStatusBadgeClass(row.status)}`}>
+                      <span className={`inline-flex w-fit items-center px-2 py-1 rounded text-[10px] font-semibold border whitespace-nowrap ${getStatusBadgeClass(row.status)}`}>
                         {getStatusLabel(row.status)}
                       </span>
-                      <span className={`inline-flex w-fit items-center px-2 py-1 rounded text-[11px] font-semibold border whitespace-nowrap ${row.priorityClass}`}>
+                      <span className={`inline-flex w-fit items-center px-2 py-1 rounded text-[10px] font-semibold border whitespace-nowrap ${row.priorityClass}`}>
                         {row.priorityLabel}
                       </span>
                     </div>
@@ -162,8 +170,8 @@ export default function CompletedTwoDayReportPage() {
     const selectedDate = new Date(`${selectedReportDateKey}T00:00:00`);
     const safeSelectedDate = Number.isNaN(selectedDate.getTime()) ? new Date() : selectedDate;
     const selectedDateKey = format(safeSelectedDate, 'yyyy-MM-dd');
-    const previousDate = addDays(safeSelectedDate, -1);
-    const previousDateKey = format(previousDate, 'yyyy-MM-dd');
+    const nextDate = addDays(safeSelectedDate, 1);
+    const nextDateKey = format(nextDate, 'yyyy-MM-dd');
     const memberTypeByName = new Map<string, 'team' | 'crew'>(
       teamMembers.map((member) => [member.name, member.memberType === 'crew' ? 'crew' : 'team'])
     );
@@ -201,19 +209,19 @@ export default function CompletedTwoDayReportPage() {
     const todayRows = mapRows(
       projectTasks.filter((task) => isTaskActiveOnDate(task, selectedDateKey))
     );
-    const yesterdayRows = mapRows(
-      projectTasks.filter((task) => isTaskActiveOnDate(task, previousDateKey))
+    const tomorrowRows = mapRows(
+      projectTasks.filter((task) => isTaskActiveOnDate(task, nextDateKey))
     );
 
     return {
       generatedAt: format(new Date(), 'dd/MM/yyyy HH:mm'),
       todayDateLabel: format(safeSelectedDate, 'dd/MM/yyyy'),
-      yesterdayDateLabel: format(previousDate, 'dd/MM/yyyy'),
+      tomorrowDateLabel: format(nextDate, 'dd/MM/yyyy'),
       todayRows,
-      yesterdayRows,
+      tomorrowRows,
       todayDoneCount: todayRows.length,
-      yesterdayDoneCount: yesterdayRows.length,
-      twoDayDoneCount: todayRows.length + yesterdayRows.length,
+      tomorrowDoneCount: tomorrowRows.length,
+      twoDayDoneCount: todayRows.length + tomorrowRows.length,
       totalCompletedCount: projectTasks.filter((task) => task.status === 'completed').length,
     };
   }, [projectTasks, selectedReportDateKey, teamMembers]);
@@ -222,6 +230,10 @@ export default function CompletedTwoDayReportPage() {
     <div className="min-h-screen bg-[#f5f6f8] p-4 sm:p-6 lg:p-8">
       <style jsx global>{`
         @media print {
+          @page {
+            size: A4 portrait;
+            margin: 10mm;
+          }
           body * {
             visibility: hidden !important;
           }
@@ -247,6 +259,27 @@ export default function CompletedTwoDayReportPage() {
           }
           body {
             background: #ffffff !important;
+          }
+          .report-table-wrap {
+            overflow: visible !important;
+          }
+          .report-table {
+            min-width: 0 !important;
+            width: 100% !important;
+            table-layout: auto !important;
+            font-size: 11px !important;
+          }
+          .report-table th,
+          .report-table td {
+            white-space: normal !important;
+            word-break: normal !important;
+            overflow-wrap: break-word !important;
+            vertical-align: top !important;
+          }
+          .report-table th {
+            font-size: 10.5px !important;
+            line-height: 1.3 !important;
+            letter-spacing: 0.01em !important;
           }
         }
       `}</style>
@@ -282,14 +315,14 @@ export default function CompletedTwoDayReportPage() {
           </button>
         </div>
 
-        <article className="print-area report-paper bg-white border border-[#cfd8e6] rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.04)] p-5 sm:p-6 space-y-5">
+        <article className="print-area report-paper bg-white border border-[#cfd8e6] rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.04)] p-5 sm:p-6 space-y-4">
           <header className="border border-[#d5dfec] rounded-lg overflow-hidden">
             <div className="bg-[#14365a] px-4 py-3 flex items-center justify-between gap-3">
               <div>
                 <div className="text-[11px] uppercase tracking-[0.16em] text-white/80 font-semibold">รายงานโครงการบริษัท</div>
-                <h1 className="text-[20px] sm:text-[22px] font-black text-white leading-tight">เอกสารประเมินผลงาน 2 วัน</h1>
+                <h1 className="text-[19px] sm:text-[21px] font-black text-white leading-tight">เอกสารประเมินผลงาน 2 วัน</h1>
               </div>
-              <div className="text-right text-white/90 text-[11px]">
+              <div className="text-right text-white/90 text-[10px]">
                 <div>รหัสเอกสาร: RPT-2D-{selectedReportDateKey.replaceAll('-', '')}</div>
                 <div>การแก้ไข: 01</div>
               </div>
@@ -297,19 +330,19 @@ export default function CompletedTwoDayReportPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-0">
               <div className="px-4 py-2.5 border-r border-b border-[#dbe4f0]">
                 <div className="text-[10px] uppercase tracking-wider text-[#6f8196] font-semibold">ชื่อโครงการ</div>
-                <div className="mt-1 text-[13px] font-semibold text-[#1f3147] break-words">{activeProject?.name || 'ไม่ได้เลือกโครงการ'}</div>
+                <div className="mt-1 text-[12px] font-semibold text-[#1f3147] break-words">{activeProject?.name || 'ไม่ได้เลือกโครงการ'}</div>
               </div>
               <div className="px-4 py-2.5 border-r border-b border-[#dbe4f0]">
                 <div className="text-[10px] uppercase tracking-wider text-[#6f8196] font-semibold">ช่วงเวลาที่รายงาน</div>
-                <div className="mt-1 text-[13px] font-semibold text-[#1f3147]">{report.yesterdayDateLabel} - {report.todayDateLabel}</div>
+                <div className="mt-1 text-[12px] font-semibold text-[#1f3147]">{report.todayDateLabel} - {report.tomorrowDateLabel}</div>
               </div>
               <div className="px-4 py-2.5 border-r border-b border-[#dbe4f0]">
                 <div className="text-[10px] uppercase tracking-wider text-[#6f8196] font-semibold">ออกเอกสารเมื่อ</div>
-                <div className="mt-1 text-[13px] font-semibold text-[#1f3147]">{report.generatedAt}</div>
+                <div className="mt-1 text-[12px] font-semibold text-[#1f3147]">{report.generatedAt}</div>
               </div>
               <div className="px-4 py-2.5 border-b border-[#dbe4f0]">
                 <div className="text-[10px] uppercase tracking-wider text-[#6f8196] font-semibold">จัดทำโดย</div>
-                <div className="mt-1 text-[13px] font-semibold text-[#1f3147]">POWERTEC ENGINEERING CO., LTD.</div>
+                <div className="mt-1 text-[12px] font-semibold text-[#1f3147]">POWERTEC ENGINEERING CO., LTD.</div>
               </div>
             </div>
           </header>
@@ -319,8 +352,8 @@ export default function CompletedTwoDayReportPage() {
             rows={report.todayRows}
           />
           <ReportTable
-            title={`วันก่อนหน้า (${report.yesterdayDateLabel}) - ${report.yesterdayDoneCount} งาน`}
-            rows={report.yesterdayRows}
+            title={`วันถัดไป (${report.tomorrowDateLabel}) - ${report.tomorrowDoneCount} งาน`}
+            rows={report.tomorrowRows}
           />
 
           <section className="grid grid-cols-2 gap-4 pt-4 border-t border-[#d9e2ee]">
