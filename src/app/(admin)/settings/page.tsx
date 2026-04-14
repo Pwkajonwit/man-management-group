@@ -4,7 +4,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Bell, Clock3, MessageSquare, RefreshCw, Save, Send, Settings2, UserPlus, Users } from 'lucide-react';
 import LinearLoadingScreen from '@/components/LinearLoadingScreen';
 import { useAppContext } from '@/contexts/AppContext';
-import { Task, TeamMember } from '@/types/construction';
+import { subscribeSystemUserAccounts } from '@/lib/firestore';
+import { SystemUserAccount, Task, TeamMember } from '@/types/construction';
 
 type ToggleSettingKey = 'notifyTaskAssigned' | 'notifyTaskStatusChanged' | 'notifyTaskCommentAdded';
 
@@ -76,14 +77,30 @@ export default function SettingsPage() {
         scopeDepartmentId,
         taskScopeBranchOptions,
         taskScopeDepartmentOptions,
+        dataSource,
     } = useAppContext();
+
+    const [systemUsers, setSystemUsers] = useState<SystemUserAccount[]>([]);
+
+    useEffect(() => {
+        if (dataSource !== 'firebase') return;
+        const unsubscribe = subscribeSystemUserAccounts((users) => {
+            setSystemUsers(users);
+        });
+        return () => unsubscribe();
+    }, [dataSource]);
 
     const [savingKey, setSavingKey] = useState<ToggleSettingKey | null>(null);
     const [isSavingLineConfig, setIsSavingLineConfig] = useState(false);
     const [isSendingTest, setIsSendingTest] = useState(false);
 
     const [lineAdminUserIdDraft, setLineAdminUserIdDraft] = useState('');
-    const [lineReportTypeDraft, setLineReportTypeDraft] = useState<'project-summary' | 'today-team-load' | 'completed-last-2-days'>('project-summary');
+    const [lineAdminGroupIdDraft, setLineAdminGroupIdDraft] = useState('');
+    const [gasWebhookUrlDraft, setGasWebhookUrlDraft] = useState('');
+
+    const [adminReportProjectSummary, setAdminReportProjectSummary] = useState(true);
+    const [adminReportTeamLoad, setAdminReportTeamLoad] = useState(true);
+    const [adminReportCompleted, setAdminReportCompleted] = useState(true);
 
     const [employeeReportEnabled, setEmployeeReportEnabled] = useState(false);
     const [employeeReportFrequency, setEmployeeReportFrequency] = useState<'daily' | 'weekly'>('weekly');
@@ -114,9 +131,39 @@ export default function SettingsPage() {
         [taskScopeDepartmentOptions]
     );
 
+    const allUsersWithLine = useMemo(() => {
+        const list: { id: string; name: string; lineUserId: string; source: string }[] = [];
+        
+        teamMembers.forEach(m => {
+            if (m.lineUserId && !list.some(x => x.lineUserId === m.lineUserId)) {
+                list.push({ id: m.id, name: m.name, lineUserId: m.lineUserId, source: 'พนักงาน' });
+            }
+        });
+        
+        systemUsers.forEach(u => {
+            if (u.lineUserId && !list.some(x => x.lineUserId === u.lineUserId)) {
+                list.push({ id: String(u.id || u.username), name: String(u.displayName || u.username), lineUserId: u.lineUserId, source: 'ผู้ใช้ระบบ' });
+            }
+        });
+        
+        return list;
+    }, [teamMembers, systemUsers]);
+
+    const [adminReportFrequency, setAdminReportFrequency] = useState<'daily' | 'weekly'>('weekly');
+    const [adminReportDayOfWeek, setAdminReportDayOfWeek] = useState<'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'>('monday');
+    const [adminReportTime, setAdminReportTime] = useState('08:00');
+
     useEffect(() => {
         setLineAdminUserIdDraft(notificationSettings.lineAdminUserId || '');
-        setLineReportTypeDraft(notificationSettings.lineReportType || 'project-summary');
+        setLineAdminGroupIdDraft(notificationSettings.lineAdminGroupId || '');
+        setGasWebhookUrlDraft(notificationSettings.gasWebhookUrl || '');
+
+        setAdminReportProjectSummary(notificationSettings.adminReportProjectSummary ?? true);
+        setAdminReportTeamLoad(notificationSettings.adminReportTeamLoad ?? true);
+        setAdminReportCompleted(notificationSettings.adminReportCompleted ?? true);
+        setAdminReportFrequency(notificationSettings.adminReportFrequency || 'weekly');
+        setAdminReportDayOfWeek(notificationSettings.adminReportDayOfWeek || 'monday');
+        setAdminReportTime(notificationSettings.adminReportTime || '08:00');
 
         setEmployeeReportEnabled(notificationSettings.employeeReportEnabled ?? false);
         setEmployeeReportFrequency(notificationSettings.employeeReportFrequency || 'weekly');
@@ -152,8 +199,15 @@ export default function SettingsPage() {
             setIsSavingLineConfig(true);
             await updateNotificationSettings({
                 lineAdminUserId: lineAdminUserIdDraft.trim(),
-                lineReportType: lineReportTypeDraft,
-                employeeReportEnabled: false,
+                lineAdminGroupId: lineAdminGroupIdDraft.trim(),
+                adminReportProjectSummary,
+                adminReportTeamLoad,
+                adminReportCompleted,
+                adminReportFrequency,
+                adminReportDayOfWeek,
+                adminReportTime,
+                gasWebhookUrl: gasWebhookUrlDraft.trim(),
+                employeeReportEnabled,
                 employeeReportFrequency,
                 employeeReportDayOfWeek,
                 employeeReportTime,
@@ -370,7 +424,10 @@ export default function SettingsPage() {
 
     const isLineConfigChanged =
         lineAdminUserIdDraft.trim() !== (notificationSettings.lineAdminUserId || '').trim() ||
-        lineReportTypeDraft !== (notificationSettings.lineReportType || 'project-summary') ||
+        lineAdminGroupIdDraft.trim() !== (notificationSettings.lineAdminGroupId || '').trim() ||
+        adminReportProjectSummary !== (notificationSettings.adminReportProjectSummary ?? true) ||
+        adminReportTeamLoad !== (notificationSettings.adminReportTeamLoad ?? true) ||
+        adminReportCompleted !== (notificationSettings.adminReportCompleted ?? true) ||
         employeeReportEnabled !== (notificationSettings.employeeReportEnabled ?? false) ||
         employeeReportFrequency !== (notificationSettings.employeeReportFrequency || 'weekly') ||
         employeeReportDayOfWeek !== (notificationSettings.employeeReportDayOfWeek || 'monday') ||
@@ -385,7 +442,8 @@ export default function SettingsPage() {
         employeeReportIncludeTaskList !== (notificationSettings.employeeReportIncludeTaskList ?? true) ||
         employeeReportMaxItems !== (notificationSettings.employeeReportMaxItems ?? 6) ||
         employeeReportDueSoonDays !== (notificationSettings.employeeReportDueSoonDays ?? 2) ||
-        employeeReportTestMemberId !== (notificationSettings.employeeReportTestMemberId || '');
+        employeeReportTestMemberId !== (notificationSettings.employeeReportTestMemberId || '') ||
+        gasWebhookUrlDraft.trim() !== (notificationSettings.gasWebhookUrl || '').trim();
 
     const renderSwitch = (
         checked: boolean,
@@ -425,122 +483,230 @@ export default function SettingsPage() {
                                 <Settings2 className="w-4 h-4 text-[#0073ea]" />
                                 การตั้งค่ารายงานผู้ดูแลระบบ
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                <input
-                                    type="text"
-                                    value={lineAdminUserIdDraft}
-                                    onChange={(e) => setLineAdminUserIdDraft(e.target.value)}
-                                    placeholder="รหัสผู้ใช้ LINE ของผู้ดูแลระบบ"
-                                    className="md:col-span-2 h-10 px-3 border border-[#d0d4e4] rounded-lg text-[14px] outline-none focus:ring-2 focus:ring-[#0073ea]"
-                                />
-                                <select
-                                    value={lineReportTypeDraft}
-                                    onChange={(e) => setLineReportTypeDraft(e.target.value as 'project-summary' | 'today-team-load' | 'completed-last-2-days')}
-                                    className="h-10 px-3 border border-[#d0d4e4] rounded-lg text-[14px] outline-none focus:ring-2 focus:ring-[#0073ea] bg-white"
-                                >
-                                    <option value="project-summary">สรุปโครงการ</option>
-                                    <option value="today-team-load">ภาระงานทีมวันนี้</option>
-                                    <option value="completed-last-2-days">เสร็จสิ้น (วันนี้ + พรุ่งนี้)</option>
-                                </select>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="flex flex-col gap-1.5">
+                                    <div className="text-[13px] font-medium text-[#323338] flex items-center gap-1.5">
+                                        👤 ส่งหาผู้ดูแลระบบ (แบบส่วนตัว 1:1)
+                                    </div>
+                                    <div className="text-[11px] text-[#676879] mt-0.5 mb-1.5">รายชื่อด้านล่างคือคนที่มีรหัส LINE ในระบบแล้ว สามารถเลือกมากกว่า 1 คนได้</div>
+                                    <div className="border border-[#d0d4e4] rounded-lg bg-white overflow-hidden max-h-[200px] overflow-y-auto">
+                                        {allUsersWithLine.length === 0 ? (
+                                            <div className="p-3 text-center text-[12px] text-[#676879]">
+                                                (ยังไม่มีผู้ใช้ใดที่ผูกบัญชี LINE)
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col">
+                                                {allUsersWithLine.map(user => {
+                                                    const currentIds = lineAdminUserIdDraft.split(',').map(s => s.trim()).filter(Boolean);
+                                                    const isChecked = currentIds.includes(user.lineUserId);
+                                                    return (
+                                                        <label key={user.lineUserId} className="flex items-center gap-3 p-2.5 border-b border-[#f5f6f8] hover:bg-[#f8fbff] cursor-pointer last:border-b-0">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isChecked}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        if (!currentIds.includes(user.lineUserId)) {
+                                                                            setLineAdminUserIdDraft([...currentIds, user.lineUserId].join(', '));
+                                                                        }
+                                                                    } else {
+                                                                        setLineAdminUserIdDraft(currentIds.filter(id => id !== user.lineUserId).join(', '));
+                                                                    }
+                                                                }}
+                                                                className="w-4 h-4 text-[#0073ea] rounded focus:ring-[#0073ea]"
+                                                            />
+                                                            <div className="flex flex-col">
+                                                                <span className="text-[13px] text-[#323338]">{user.name}</span>
+                                                                <span className="text-[10px] text-[#676879]">[{user.source}] • {user.lineUserId}</span>
+                                                            </div>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="mt-2 text-[12px] font-medium text-[#323338]">เพิ่มไอดีกำหนดเอง:</div>
+                                    <input
+                                        type="text"
+                                        value={lineAdminUserIdDraft}
+                                        onChange={(e) => setLineAdminUserIdDraft(e.target.value)}
+                                        placeholder="รหัสผู้ใช้ LINE (Uxxxx...)"
+                                        className="w-full h-9 px-3 border border-[#d0d4e4] rounded-lg text-[13px] outline-none mb-2"
+                                    />
+                                </div>
+
+                                <div className="flex flex-col gap-1.5">
+                                     <div className="text-[13px] font-medium text-[#323338] flex items-center gap-1.5">
+                                        👥 ส่งเข้ากลุ่มไลน์ (Group ID)
+                                    </div>
+                                    <div className="text-[11px] text-[#676879] mt-0.5 mb-1.5">นำ LINE Group ID มาวาง เพื่อส่งเข้ากลุ่มส่วนรวม</div>
+                                    <input
+                                        type="text"
+                                        value={lineAdminGroupIdDraft}
+                                        onChange={(e) => setLineAdminGroupIdDraft(e.target.value)}
+                                        placeholder="เช่น C1234567890abcdef... (แยกหลายกลุ่มด้วยคั่นคอมม่า)"
+                                        className="w-full h-10 px-3 border border-[#d0d4e4] rounded-lg text-[14px] outline-none focus:ring-2 focus:ring-[#0073ea]"
+                                    />
+                                    <div className="mt-2 text-[11px] text-[#676879] px-2 p-2 bg-[#f8fbff] border border-[#e6e9ef] rounded-lg">
+                                        💡 <b>วิธียิงข้อความเข้ากลุ่ม:</b> บัญชี LINE OA ของคุณต้องเคยถูกเชิญชวน (Invite) เข้าไปในกลุ่มนี้ก่อน ถึงจะมีความสามารถในการส่งข้อความเข้าไปได้
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 gap-2 mt-4 pt-4 border-t border-[#e6e9ef]">
+                                {renderSwitch(adminReportProjectSummary, setAdminReportProjectSummary, 'รวมสรุปโครงการ', 'ภาพรวมความคืบหน้าของโครงการทั้งหมด')}
+                                {renderSwitch(adminReportTeamLoad, setAdminReportTeamLoad, 'รวมภาระงานทีม', 'แจกแจงงานรายบุคคลของทีมในวันนี้')}
+                                {renderSwitch(adminReportCompleted, setAdminReportCompleted, 'รวมงานที่เสร็จสิ้น (ล่าสุด)', 'สรุปเฉพาะงานที่เสร็จสมบูรณ์เมื่อวานและวันนี้')}
+                                
+                                <div className="mt-4 flex flex-wrap gap-4 items-center">
+                                    <div className="flex flex-col gap-1.5 min-w-[150px]">
+                                        <div className="text-[12px] font-medium text-[#323338]">ความถี่ (สำหรับผู้ดูแลระบบ):</div>
+                                        <div className="flex rounded-md border border-[#d0d4e4] overflow-hidden">
+                                            <button
+                                                type="button"
+                                                onClick={() => setAdminReportFrequency('daily')}
+                                                className={`flex-1 py-1.5 px-3 text-[12px] font-medium transition-colors ${adminReportFrequency === 'daily' ? 'bg-[#e2f0ff] text-[#0073ea] border-b-2 border-[#0073ea]' : 'bg-white text-[#676879] hover:bg-gray-50'}`}
+                                            >
+                                                ทุกวัน (Daily)
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setAdminReportFrequency('weekly')}
+                                                className={`flex-1 py-1.5 px-3 text-[12px] font-medium transition-colors ${adminReportFrequency === 'weekly' ? 'bg-[#e2f0ff] text-[#0073ea] border-b-2 border-[#0073ea]' : 'bg-white text-[#676879] hover:bg-gray-50'}`}
+                                            >
+                                                รายสัปดาห์
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex flex-col gap-1.5 min-w-[100px]">
+                                        <div className="text-[12px] font-medium text-[#323338]">เวลา (แนะนำ):</div>
+                                        <input
+                                            type="time"
+                                            value={adminReportTime}
+                                            onChange={(e) => setAdminReportTime(e.target.value)}
+                                            className="border rounded px-2 py-1.5 text-[13px] text-[#323338]"
+                                        />
+                                    </div>
+                                    <div className="w-full mt-2 p-2 bg-[#fffced] border border-[#ffecb3] rounded-lg text-[11px] text-[#856404] flex items-center gap-2">
+                                        🕒 <b>หมายเหตุ:</b> ระบบรายงานผ่าน Apps Script ของคุณถูกตั้งค่าให้ทำงานตอน <b>08:00 น. และ 17:00 น.</b> ของทุกวัน
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
                         <div className="bg-white border border-[#d0d4e4] rounded-xl p-4 space-y-3">
                             <div className="flex items-center gap-2 text-[15px] font-semibold text-[#323338]">
-                                <Users className="w-4 h-4 text-[#0073ea]" />
-                                การตั้งค่ารายงานพนักงาน
+                                <RefreshCw className="w-4 h-4 text-[#0073ea]" />
+                                Webhook Google Apps Script
                             </div>
-
-                            <div className="rounded-lg border border-[#ffe1b3] bg-[#fff7e6] px-3 py-2 text-[12px] text-[#8a5a00]">
-                                ระบบส่งรายงานพนักงานอัตโนมัติยังไม่เปิดใช้งานในเวอร์ชันนี้ ขณะนี้รองรับการส่งรายงานทดสอบด้วยตนเองเท่านั้น เพื่อป้องกันการตั้งค่าคลาดเคลื่อน ระบบจะไม่บันทึกสถานะ &quot;เปิดใช้งานรายงานพนักงาน&quot; เป็นอัตโนมัติ
+                            <div className="rounded-lg border border-[#e6e9ef] bg-[#f8fbff] px-3 py-2 text-[12px] text-[#516273]">
+                                ก๊อปปี้โค้ดด้านล่างนี้ ไปวางใน Google Apps Script เพื่อให้ทำงานเป็นนาฬิกาปลุกมาสะกิดระบบ
                             </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                {renderSwitch(false, () => undefined, 'รายงานพนักงานอัตโนมัติ', 'ยังไม่พร้อมใช้งานในระบบจริง')}
-                                {renderSwitch(employeeReportIncludeTaskList, setEmployeeReportIncludeTaskList, 'รวมรายชื่อส่วนการทำงาน', 'รวมรายการงานหลักลงในรายงาน')}
+                            <div className="relative">
+                                <pre className="bg-[#1e1e1e] text-[#d4d4d4] p-4 rounded-lg text-[11px] overflow-x-auto" style={{ fontFamily: 'monospace' }}>
+{`function triggerReport() {
+  const url = '\${typeof window !== 'undefined' ? window.location.origin : 'https://your-domain.com'}/api/cron/trigger-report';
+  const options = {
+    method: 'post',
+    headers: { 'Authorization': 'Bearer man-cron-secret-12345' },
+    muteHttpExceptions: true
+  };
+  UrlFetchApp.fetch(url, options);
+}`}
+                                </pre>
                             </div>
+                        </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-                                <select
-                                    value={employeeReportFrequency}
-                                    onChange={(e) => setEmployeeReportFrequency(e.target.value as 'daily' | 'weekly')}
-                                    disabled
-                                    className="h-10 px-3 border border-[#d0d4e4] rounded-lg text-[13px] outline-none bg-white disabled:opacity-60"
-                                >
-                                    <option value="daily">ความถี่: รายวัน</option>
-                                    <option value="weekly">ความถี่: รายสัปดาห์</option>
-                                </select>
-                                <select
-                                    value={employeeReportDayOfWeek}
-                                    onChange={(e) => setEmployeeReportDayOfWeek(e.target.value as (typeof dayOptions)[number])}
-                                    disabled
-                                    className="h-10 px-3 border border-[#d0d4e4] rounded-lg text-[13px] outline-none bg-white disabled:opacity-60"
-                                >
-                                    {dayOptions.map((day) => (
-                                        <option key={day} value={day}>{`วัน: ${day}`}</option>
-                                    ))}
-                                </select>
-                                <div className="relative">
-                                    <Clock3 className="w-4 h-4 text-[#676879] absolute left-3 top-3" />
-                                    <input
-                                        type="time"
-                                        value={employeeReportTime}
-                                        onChange={(e) => setEmployeeReportTime(e.target.value)}
-                                        disabled
-                                        className="h-10 w-full pl-9 pr-3 border border-[#d0d4e4] rounded-lg text-[13px] outline-none disabled:opacity-60"
-                                    />
+                        <div className="bg-white border border-[#d0d4e4] rounded-xl p-4 space-y-3">
+                            <div className="flex items-center justify-between pb-2 border-b border-[#e6e9ef]">
+                                <div className="flex items-center gap-2 text-[15px] font-semibold text-[#323338]">
+                                    <Users className="w-4 h-4 text-[#0073ea]" />
+                                    การตั้งค่ารายงานพนักงาน (ผ่าน AppScript)
                                 </div>
-                                <select
-                                    value={employeeReportScope}
-                                    onChange={(e) => setEmployeeReportScope(e.target.value as 'active-project' | 'all-projects' | 'active-branch' | 'active-department')}
-                                    className="h-10 px-3 border border-[#d0d4e4] rounded-lg text-[13px] outline-none bg-white"
-                                >
-                                    <option value="active-project">ขอบเขต: โครงการปัจจุบัน</option>
-                                    <option value="all-projects">ขอบเขต: โครงการทั้งหมด</option>
-                                    <option value="active-branch">ขอบเขต: สาขาปัจจุบัน</option>
-                                    <option value="active-department">ขอบเขต: แผนกปัจจุบัน</option>
-                                </select>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-                                <select
-                                    value={employeeReportTemplate}
-                                    onChange={(e) => setEmployeeReportTemplate(e.target.value as 'compact' | 'detailed')}
-                                    className="h-10 px-3 border border-[#d0d4e4] rounded-lg text-[13px] outline-none bg-white"
-                                >
-                                    <option value="compact">รูปแบบ: กะทัดรัด</option>
-                                    <option value="detailed">รูปแบบ: ละเอียด</option>
-                                </select>
-                                <input
-                                    type="number"
-                                    min={1}
-                                    max={20}
-                                    value={employeeReportMaxItems}
-                                    onChange={(e) => setEmployeeReportMaxItems(Number(e.target.value) || 1)}
-                                    className="h-10 px-3 border border-[#d0d4e4] rounded-lg text-[13px] outline-none"
-                                    placeholder="จำนวนงานสูงสุด"
-                                />
-                                <input
-                                    type="number"
-                                    min={1}
-                                    max={14}
-                                    value={employeeReportDueSoonDays}
-                                    onChange={(e) => setEmployeeReportDueSoonDays(Number(e.target.value) || 1)}
-                                    className="h-10 px-3 border border-[#d0d4e4] rounded-lg text-[13px] outline-none"
-                                    placeholder="แจ้งเตือนก่อน (วัน)"
-                                />
-                                <div className="h-10 px-3 border border-[#d0d4e4] rounded-lg text-[12px] text-[#676879] flex items-center">
-                                    ขอบเขตที่ใช้: {reportScopeLabel}
+                                <div className="w-12">
+                                    <button
+                                        type="button"
+                                        onClick={() => setEmployeeReportEnabled(!employeeReportEnabled)}
+                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${employeeReportEnabled ? 'bg-[#00c875]' : 'bg-[#c4c4c4]'}`}
+                                    >
+                                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${employeeReportEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                                    </button>
                                 </div>
                             </div>
+                            
+                            {employeeReportEnabled && (
+                                <div className="space-y-4 pt-2">
+                                    <div className="rounded-lg border border-[#e6e9ef] bg-[#f8fbff] px-3 py-2 text-[12px] text-[#516273]">
+                                        เมื่อกดเปิดแล้ว พอถึงเวลาที่ AppScript สะกิดมา ระบบจะรวมรายการของ "การตั้งค่ารายงานส่วนพนักงาน" ยิงเข้า LINE ให้ด้วย
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 gap-2">
+                                        <div className="text-[13px] font-medium text-[#323338]">ตั้งค่าขอบเขตการดึงรายงานพนักงาน</div>
+                                        <select
+                                            value={employeeReportScope}
+                                            onChange={(e) => setEmployeeReportScope(e.target.value as 'active-project' | 'all-projects' | 'active-branch' | 'active-department')}
+                                            className="h-10 px-3 border border-[#d0d4e4] rounded-lg text-[13px] outline-none bg-white"
+                                        >
+                                            <option value="active-project">เฉพาะงานที่อยู่ในโครงการปัจจุบัน</option>
+                                            <option value="all-projects">รวมงานจากทุกโครงการ</option>
+                                            <option value="active-branch">รวมงานตามสาขา</option>
+                                            <option value="active-department">รวมงานตามแผนก</option>
+                                        </select>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-2 mt-2">
+                                        <div className="text-[13px] font-medium text-[#323338]">ความถี่ในการแจ้งเตือนพนักงาน</div>
+                                        <div className="flex rounded-md border border-[#d0d4e4] overflow-hidden w-full max-w-sm">
+                                            <button
+                                                type="button"
+                                                onClick={() => setEmployeeReportFrequency('daily')}
+                                                className={`flex-1 py-1.5 px-3 text-[12px] font-medium transition-colors ${employeeReportFrequency === 'daily' ? 'bg-[#e2f0ff] text-[#0073ea] border-b-2 border-[#0073ea]' : 'bg-white text-[#676879] hover:bg-gray-50'}`}
+                                            >
+                                                ทุกวัน (Daily)
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setEmployeeReportFrequency('weekly')}
+                                                className={`flex-1 py-1.5 px-3 text-[12px] font-medium transition-colors ${employeeReportFrequency === 'weekly' ? 'bg-[#e2f0ff] text-[#0073ea] border-b-2 border-[#0073ea]' : 'bg-white text-[#676879] hover:bg-gray-50'}`}
+                                            >
+                                                รายสัปดาห์
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    {employeeReportFrequency === 'weekly' && (
+                                        <div className="grid grid-cols-1 gap-2 mt-2">
+                                            <div className="text-[13px] font-medium text-[#323338]">รันแจ้งเตือนวันไหน</div>
+                                            <select
+                                                value={employeeReportDayOfWeek}
+                                                onChange={(e) => setEmployeeReportDayOfWeek(e.target.value as any)}
+                                                className="h-10 px-3 border border-[#d0d4e4] rounded-lg text-[13px] outline-none bg-white max-w-sm"
+                                            >
+                                                <option value="monday">วันจันทร์</option>
+                                                <option value="tuesday">วันอังคาร</option>
+                                                <option value="wednesday">วันพุธ</option>
+                                                <option value="thursday">วันพฤหัสบดี</option>
+                                                <option value="friday">วันศุกร์</option>
+                                                <option value="saturday">วันเสาร์</option>
+                                                <option value="sunday">วันอาทิตย์</option>
+                                            </select>
+                                        </div>
+                                    )}
+                                    <div className="grid grid-cols-1 gap-2 mt-2">
+                                        <div className="text-[13px] font-medium text-[#323338]">เวลาที่ต้องการส่ง (แนะนำ 08:00 หรือ 17:00)</div>
+                                        <input
+                                            type="time"
+                                            value={employeeReportTime}
+                                            onChange={(e) => setEmployeeReportTime(e.target.value)}
+                                            className="h-10 px-3 border border-[#d0d4e4] rounded-lg text-[13px] outline-none bg-white max-w-sm"
+                                        />
+                                    </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                {renderSwitch(employeeReportIncludeOverdue, setEmployeeReportIncludeOverdue, 'รวมงานที่เกินกำหนด')}
-                                {renderSwitch(employeeReportIncludeDueSoon, setEmployeeReportIncludeDueSoon, 'รวมงานที่ใกล้ถึงกำหนด')}
-                                {renderSwitch(employeeReportIncludeInProgress, setEmployeeReportIncludeInProgress, 'รวมสถานะกำลังดำเนินการ')}
-                                {renderSwitch(employeeReportIncludeNotStarted, setEmployeeReportIncludeNotStarted, 'รวมสถานะยังไม่เริ่ม')}
-                                {renderSwitch(employeeReportIncludeCompleted, setEmployeeReportIncludeCompleted, 'รวมสถานะเสร็จสิ้น')}
-                            </div>
+                                    <div className="w-full mt-2 p-2 bg-[#fffced] border border-[#ffecb3] rounded-lg text-[11px] text-[#856404] flex items-center gap-2">
+                                        🕒 <b>หมายเหตุ:</b> พนักงานจะได้รับรายงานในเวลาที่ Apps Script รันเท่านั้น (ปัจจุบันตั้งไว้ที่ 08:00 และ 17:00 น.)
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="bg-white border border-[#d0d4e4] rounded-xl p-4">

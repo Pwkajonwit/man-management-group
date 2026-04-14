@@ -133,7 +133,10 @@ const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
     notifyTaskStatusChanged: true,
     notifyTaskCommentAdded: true,
     lineAdminUserId: '',
-    lineReportType: 'project-summary',
+    lineAdminGroupId: '',
+    adminReportProjectSummary: true,
+    adminReportTeamLoad: true,
+    adminReportCompleted: true,
     employeeReportEnabled: false,
     employeeReportFrequency: 'weekly',
     employeeReportDayOfWeek: 'monday',
@@ -149,6 +152,7 @@ const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
     employeeReportMaxItems: 6,
     employeeReportDueSoonDays: 2,
     employeeReportTestMemberId: '',
+    gasWebhookUrl: '',
 };
 const ALL_SCOPE_VALUE = 'all';
 

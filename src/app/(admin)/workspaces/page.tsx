@@ -687,7 +687,7 @@ export default function TaskBoardPage() {
     });
     if (!confirmed) return;
 
-    const reportType = notificationSettings.lineReportType || 'project-summary';
+    const reportType = 'project-summary';
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const statusCounts = projectTasks.reduce(
       (acc, task) => {

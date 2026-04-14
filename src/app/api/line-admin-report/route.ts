@@ -8,6 +8,7 @@ interface ReportPayload {
     projectName: string;
     projectId?: string;
     adminLineUserId?: string;
+    adminLineGroupId?: string;
     reportType?: 'project-summary' | 'today-team-load' | 'completed-last-2-days';
     teamLoad?: Array<{
         name: string;
@@ -106,6 +107,9 @@ function isValidReportPayload(body: unknown): body is ReportPayload {
     if (input.projectId !== undefined && typeof input.projectId !== 'string') return false;
 
     if (input.adminLineUserId !== undefined && typeof input.adminLineUserId !== 'string') {
+        return false;
+    }
+    if (input.adminLineGroupId !== undefined && typeof input.adminLineGroupId !== 'string') {
         return false;
     }
     if (
@@ -390,8 +394,19 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ ok: false, error: 'Invalid payload' }, { status: 400 });
         }
 
-        const targetLineUserId = (body.adminLineUserId || '').trim() || LINE_ADMIN_USER_ID_FROM_ENV.trim();
-        if (!targetLineUserId) {
+        const targetIds = [
+            (body.adminLineUserId || '').trim(),
+            (body.adminLineGroupId || '').trim(),
+            LINE_ADMIN_USER_ID_FROM_ENV.trim()
+        ]
+            .join(',')
+            .split(',')
+            .map(id => id.trim())
+            .filter(Boolean);
+
+        const uniqueTargetIds = Array.from(new Set(targetIds));
+
+        if (uniqueTargetIds.length === 0) {
             return NextResponse.json(
                 { ok: false, error: 'LINE admin user ID is not configured in Settings or environment' },
                 { status: 500 }
@@ -400,21 +415,24 @@ export async function POST(request: NextRequest) {
 
         const flexMessage = buildFlexMessage(body);
 
-        const response = await fetch(LINE_PUSH_URL, {
+        const pushPromises = uniqueTargetIds.map(targetId => fetch(LINE_PUSH_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`,
             },
             body: JSON.stringify({
-                to: targetLineUserId,
+                to: targetId,
                 messages: [flexMessage],
             }),
-        });
+        }));
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            return NextResponse.json({ ok: false, error: errorText }, { status: response.status });
+        const responses = await Promise.all(pushPromises);
+        const failedResponse = responses.find(r => !r.ok);
+
+        if (failedResponse) {
+            const errorText = await failedResponse.text();
+            return NextResponse.json({ ok: false, error: errorText }, { status: failedResponse.status });
         }
 
         return NextResponse.json({ ok: true });

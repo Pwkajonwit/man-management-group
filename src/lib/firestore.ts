@@ -305,9 +305,21 @@ export function subscribeNotificationSettings(callback: (settings: NotificationS
             notifyTaskStatusChanged: data.notifyTaskStatusChanged ?? true,
             notifyTaskCommentAdded: data.notifyTaskCommentAdded ?? true,
             lineAdminUserId: (typeof data.lineAdminUserId === 'string' ? data.lineAdminUserId : '').trim(),
-            lineReportType: data.lineReportType === 'today-team-load' || data.lineReportType === 'completed-last-2-days'
-                ? data.lineReportType
-                : 'project-summary',
+            lineAdminGroupId: (typeof data.lineAdminGroupId === 'string' ? data.lineAdminGroupId : '').trim(),
+            adminReportProjectSummary: data.adminReportProjectSummary ?? true,
+            adminReportTeamLoad: data.adminReportTeamLoad ?? true,
+            adminReportCompleted: data.adminReportCompleted ?? true,
+            
+            adminReportFrequency: data.adminReportFrequency === 'daily' ? 'daily' : 'weekly',
+            adminReportDayOfWeek: (() => {
+                const day = data.adminReportDayOfWeek;
+                if (day === 'monday' || day === 'tuesday' || day === 'wednesday' || day === 'thursday' || day === 'friday' || day === 'saturday' || day === 'sunday') {
+                    return day;
+                }
+                return 'monday';
+            })(),
+            adminReportTime: typeof data.adminReportTime === 'string' && /^\d{2}:\d{2}$/.test(data.adminReportTime) ? data.adminReportTime : '08:00',
+
             employeeReportEnabled: data.employeeReportEnabled ?? false,
             employeeReportFrequency: data.employeeReportFrequency === 'daily' ? 'daily' : 'weekly',
             employeeReportDayOfWeek: (() => {

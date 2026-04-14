@@ -83,7 +83,9 @@ export default function UserManagementView({
     const [newMemberName, setNewMemberName] = useState('');
     const [newMemberBranchId, setNewMemberBranchId] = useState('');
     const [newMemberDepartmentId, setNewMemberDepartmentId] = useState('');
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [newMemberPhone, setNewMemberPhone] = useState('');
+    const [newMemberLineUserId, setNewMemberLineUserId] = useState('');
     const [newMemberCapacity, setNewMemberCapacity] = useState('48');
     const [newMemberType, setNewMemberType] = useState<MemberType>('team');
     const [newMemberAvatar, setNewMemberAvatar] = useState('');
@@ -310,6 +312,7 @@ export default function UserManagementView({
             position: branchLabel,
             department: departmentLabel,
             phone: newMemberPhone.trim() || '-',
+            lineUserId: newMemberLineUserId.trim() || undefined,
             capacityHoursPerWeek: Number.parseInt(newMemberCapacity, 10) || 48,
             avatar: newMemberAvatar || undefined,
         };
@@ -319,9 +322,11 @@ export default function UserManagementView({
         setNewMemberBranchId(branchOptions[0]?.id || '');
         setNewMemberDepartmentId('');
         setNewMemberPhone('');
+        setNewMemberLineUserId('');
         setNewMemberCapacity('48');
         setNewMemberType('team');
         setNewMemberAvatar('');
+        setIsAddModalOpen(false);
     };
 
     const startEditingMember = (member: TeamMember) => {
@@ -504,6 +509,7 @@ export default function UserManagementView({
         setNewSystemProvider('password');
         setNewSystemPassword('');
         setNewSystemRole('staff');
+        setIsAddModalOpen(false);
     };
 
     const startEditingSystemUser = (user: SystemUserAccount) => {
@@ -613,7 +619,12 @@ export default function UserManagementView({
                     <div className="bg-white rounded-xl shadow-sm border border-[#d0d4e4] overflow-hidden">
                         <div className="p-4 sm:p-6 border-b border-[#d0d4e4] bg-[#f5f6f8] space-y-4">
                             <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
-                                <h2 className="text-xl font-semibold text-[#323338]">รายการผู้ใช้</h2>
+                                <div className="flex items-center gap-4">
+                                    <h2 className="text-xl font-semibold text-[#323338]">รายการผู้ใช้</h2>
+                                    <button onClick={() => setIsAddModalOpen(true)} className="bg-[#0073ea] hover:bg-[#0060c0] text-white px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors flex items-center gap-1.5 shadow-sm">
+                                        <Plus className="w-4 h-4" /> เพิ่มพนักงาน / ผู้ใช้ระบบ
+                                    </button>
+                                </div>
                                 <div className="relative w-full lg:w-[320px]">
                                     <Search className="absolute left-3 top-2.5 w-4 h-4 text-[#a0a2b1]" />
                                     <input
@@ -648,77 +659,6 @@ export default function UserManagementView({
                                     ผู้ใช้ระบบ ({summary.systemUsers})
                                 </button>
                             </div>
-
-                            {memberTab !== 'system' ? (
-                                <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-start">
-                                    <div className="shrink-0">
-                                        <input type="file" accept="image/*" ref={newAvatarRef} onChange={handleNewAvatarUpload} className="hidden" />
-                                        <button onClick={() => newAvatarRef.current?.click()} className="relative group" title="อัปโหลดรูปภาพ">
-                                            {newMemberAvatar ? (
-                                                <div className="relative">
-                                                    <img src={newMemberAvatar} alt="รูปพนักงานใหม่" className="w-[42px] h-[42px] rounded-full object-cover border-2 border-[#0073ea] shadow-sm" />
-                                                    <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                        <Camera className="w-4 h-4 text-white" />
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="w-[42px] h-[42px] rounded-full bg-[#e6e9ef] border-2 border-dashed border-[#a0a2b1] flex items-center justify-center text-[#a0a2b1] hover:border-[#0073ea] hover:text-[#0073ea] transition-colors">
-                                                    <ImagePlus className="w-5 h-5" />
-                                                </div>
-                                            )}
-                                        </button>
-                                    </div>
-                                    <div className="flex-1 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-6">
-                                        <input value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} placeholder="ชื่อ" className="w-full bg-white border border-[#d0d4e4] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#0073ea] text-[#323338]" />
-                                        <select value={newMemberType} onChange={(e) => setNewMemberType(e.target.value as MemberType)} className="w-full bg-white border border-[#d0d4e4] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#0073ea] text-[#323338]">
-                                            <option value="team">พนักงานประจำ</option>
-                                            <option value="crew">พนักงานชั่วคราว</option>
-                                        </select>
-                                        <select value={newMemberBranchId} onChange={(e) => setNewMemberBranchId(e.target.value)} className="w-full bg-white border border-[#d0d4e4] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#0073ea] text-[#323338]">
-                                            {branchOptions.map((option) => (
-                                                <option key={option.id} value={option.id}>{option.label}</option>
-                                            ))}
-                                        </select>
-                                        <select value={newMemberDepartmentId} onChange={(e) => setNewMemberDepartmentId(e.target.value)} className="w-full bg-white border border-[#d0d4e4] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#0073ea] text-[#323338]">
-                                            {newMemberDepartmentOptions.map((option) => (
-                                                <option key={option.id} value={option.id}>{option.label}</option>
-                                            ))}
-                                        </select>
-                                        <input value={newMemberPhone} onChange={(e) => setNewMemberPhone(e.target.value)} placeholder="เบอร์โทร" className="w-full bg-white border border-[#d0d4e4] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#0073ea] text-[#323338]" />
-                                        <input type="number" min="1" max="168" value={newMemberCapacity} onChange={(e) => setNewMemberCapacity(e.target.value)} placeholder="ชั่วโมงทำงาน / สัปดาห์" className="w-full bg-white border border-[#d0d4e4] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#0073ea] text-[#323338]" />
-                                    </div>
-                                    <button onClick={handleAddMember} disabled={!newMemberName.trim()} className="bg-[#0073ea] hover:bg-[#0060c0] disabled:bg-[#d0d4e4] disabled:cursor-not-allowed text-white px-5 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 h-[42px] w-full lg:w-auto">
-                                        <Plus className="w-4 h-4" /> เพิ่ม
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-8 gap-2 items-center">
-                                    <input value={newSystemDisplayName} onChange={(e) => setNewSystemDisplayName(e.target.value)} placeholder="ชื่อที่แสดง" className="w-full bg-white border border-[#d0d4e4] rounded-lg px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-[#0073ea]" />
-                                    <input value={newSystemUsername} onChange={(e) => setNewSystemUsername(e.target.value)} placeholder="ชื่อผู้ใช้" className="w-full bg-white border border-[#d0d4e4] rounded-lg px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-[#0073ea]" />
-                                    <input value={newSystemEmail} onChange={(e) => setNewSystemEmail(e.target.value)} placeholder="อีเมล" className="w-full bg-white border border-[#d0d4e4] rounded-lg px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-[#0073ea]" />
-                                    <input value={newSystemPhone} onChange={(e) => setNewSystemPhone(e.target.value)} placeholder="เบอร์โทร" className="w-full bg-white border border-[#d0d4e4] rounded-lg px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-[#0073ea]" />
-                                    <input value={newSystemLineUserId} onChange={(e) => setNewSystemLineUserId(e.target.value)} placeholder="ไอดีผู้ใช้ LINE" className="w-full bg-white border border-[#d0d4e4] rounded-lg px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-[#0073ea]" />
-                                    <select value={newSystemProvider} onChange={(e) => {
-                                        const nextProvider = e.target.value as SystemUserAccount['authProvider'];
-                                        setNewSystemProvider(nextProvider);
-                                        if (nextProvider === 'line') {
-                                            setNewSystemPassword('');
-                                        }
-                                    }} className="w-full bg-white border border-[#d0d4e4] rounded-lg px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-[#0073ea]">
-                                        <option value="password">ผู้ใช้/รหัสผ่าน</option>
-                                        <option value="line">LINE</option>
-                                    </select>
-                                    <select value={newSystemRole} onChange={(e) => setNewSystemRole(e.target.value as SystemUserRole)} className="w-full bg-white border border-[#d0d4e4] rounded-lg px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-[#0073ea]">
-                                        {SYSTEM_ROLE_OPTIONS.map((option) => (
-                                            <option key={option.value} value={option.value}>{option.label}</option>
-                                        ))}
-                                    </select>
-                                    <input type="password" value={newSystemPassword} onChange={(e) => setNewSystemPassword(e.target.value)} placeholder={newSystemProvider === 'password' ? 'รหัสผ่าน' : 'รหัสผ่าน (เฉพาะผู้ใช้/รหัสผ่าน)'} disabled={newSystemProvider !== 'password'} className="w-full bg-white border border-[#d0d4e4] rounded-lg px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-[#0073ea] disabled:bg-[#f5f6f8] disabled:text-[#98a2b3]" />
-                                    <button type="button" onClick={() => void handleAddSystemUserSubmit()} disabled={!newSystemDisplayName.trim() || !newSystemUsername.trim() || !newSystemEmail.trim() || (newSystemProvider === 'password' && newSystemPassword.trim().length < 6)} className="bg-[#334155] hover:bg-[#1f2937] disabled:bg-[#d0d4e4] disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-[13px] font-medium">
-                                        เพิ่มผู้ใช้
-                                    </button>
-                                </div>
-                            )}
                         </div>
 
                         {memberTab === 'system' ? (
@@ -730,8 +670,13 @@ export default function UserManagementView({
                                         : 'inline-flex items-center rounded-full border border-[#b8ebd2] bg-[#e6faef] px-2 py-0.5 text-[10px] font-bold text-[#008a59]';
 
                                     return (
-                                        <div key={user.id} className="p-4 grid grid-cols-1 lg:grid-cols-[1.2fr_1fr_1.1fr_1fr_auto] gap-3 items-start hover:bg-[#f8fafc]">
-                                            <div className="space-y-2 min-w-0">
+                                        <div key={user.id} className="p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 hover:bg-[#f8fafc]">
+                                            <div className="flex items-start gap-4 min-w-0 flex-1">
+                                                <div className="w-[44px] h-[44px] bg-[#eef4ff] text-[#0052cc] rounded-full flex items-center justify-center font-bold text-[18px] shrink-0 uppercase">
+                                                    {(user.displayName || user.username || 'U').charAt(0)}
+                                                </div>
+                                                <div className="min-w-0 flex-1 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-x-4 gap-y-2">
+                                                    <div className="space-y-2 min-w-0 flex flex-col justify-center">
                                                 {editingSystemUserId === user.id ? (
                                                     <>
                                                         <input value={editingSystemData.displayName || ''} onChange={(e) => setEditingSystemData({ ...editingSystemData, displayName: e.target.value })} className="w-full bg-white border border-[#0073ea] rounded px-3 py-2 text-[13px] outline-none" placeholder="ชื่อที่แสดง" />
@@ -786,11 +731,13 @@ export default function UserManagementView({
                                                     </>
                                                 )}
                                             </div>
-                                            <div className="space-y-2 text-[13px] text-[#676879]">
-                                                <div>เข้าสู่ระบบล่าสุด: {formatDateTime(user.lastLoginAt)}</div>
+                                            <div className="space-y-2 text-[13px] text-[#676879] flex flex-col justify-center">
+                                                <div>เข้าสู่ระบบล่าสุด: <span className="font-medium text-[#323338]">{formatDateTime(user.lastLoginAt)}</span></div>
                                                 <div>วันที่สร้าง: {formatDateTime(user.createdAt)}</div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="flex items-center justify-end gap-1.5">
+                                            <div className="flex items-center gap-2 shrink-0 self-end lg:self-auto">
                                                 {editingSystemUserId === user.id ? (
                                                     <>
                                                         <button type="button" onClick={() => void saveEditingSystemUser()} className="text-[#00c875] p-1.5 hover:bg-[#e6faef] rounded-md transition-all"><Check className="w-4 h-4" /></button>
@@ -819,7 +766,7 @@ export default function UserManagementView({
                                         <div key={member.id} className="p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 hover:bg-[#f8fafc]">
                                             <div className="flex items-start gap-4 min-w-0 flex-1">
                                                 <AvatarDisplay member={editingMemberId === member.id ? { name: editingData.name || member.name, avatar: editingData.avatar || member.avatar } : member} size={44} />
-                                                <div className="min-w-0 flex-1 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-2">
+                                                <div className="min-w-0 flex-1 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-x-4 gap-y-2">
                                                     {editingMemberId === member.id ? (
                                                         <>
                                                             <input value={editingData.name || ''} onChange={(e) => setEditingData({ ...editingData, name: e.target.value })} className="w-full bg-white border border-[#0073ea] rounded px-3 py-2 text-[13px] outline-none" placeholder="ชื่อ" />
@@ -852,19 +799,27 @@ export default function UserManagementView({
                                                                 ))}
                                                             </select>
                                                             <input value={editingData.phone || ''} onChange={(e) => setEditingData({ ...editingData, phone: e.target.value })} className="w-full bg-white border border-[#0073ea] rounded px-3 py-2 text-[13px] outline-none" placeholder="เบอร์โทร" />
+                                                            <input value={editingData.lineUserId || ''} onChange={(e) => setEditingData({ ...editingData, lineUserId: e.target.value })} className="w-full bg-white border border-[#0073ea] rounded px-3 py-2 text-[13px] outline-none" placeholder="ไอดีผู้ใช้ LINE" />
                                                             <input type="number" min="1" max="168" value={String(editingData.capacityHoursPerWeek ?? capacity)} onChange={(e) => setEditingData({ ...editingData, capacityHoursPerWeek: Number.parseInt(e.target.value, 10) || 40 })} className="w-full bg-white border border-[#0073ea] rounded px-3 py-2 text-[13px] outline-none" placeholder="ชั่วโมงทำงาน / สัปดาห์" />
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <div className="min-w-0">
+                                                            <div className="min-w-0 flex flex-col justify-center">
                                                                 <div className="text-[14px] font-semibold text-[#323338] truncate">{member.name}</div>
-                                                                <div className="text-[12px] text-[#676879] mt-1">{getMemberTypeLabel(getMemberType(member))}</div>
+                                                                <div className="text-[12px] text-[#0073ea] font-medium mt-0.5">{getMemberTypeLabel(getMemberType(member))}</div>
                                                             </div>
-                                                            <div className="text-[13px] text-[#676879] truncate">สาขา: {getMemberBranchLabel(member)}</div>
-                                                            <div className="text-[13px] text-[#676879] truncate">แผนก: {getMemberDepartmentLabel(member)}</div>
-                                                            <div className="text-[13px] text-[#676879] truncate">{member.phone}</div>
-                                                            <div className="text-[13px] text-[#676879] truncate">กำลังงาน: {capacity} ชม.</div>
-                                                            <div className={overloaded ? 'text-[13px] font-medium truncate text-[#e2445c]' : 'text-[13px] font-medium truncate text-[#0052cc]'}>ภาระงาน: {load.assignedHours} ชม. / {load.taskCount} งาน</div>
+                                                            <div className="min-w-0 flex flex-col justify-center">
+                                                                <div className="text-[13px] text-[#323338] truncate font-medium">{getMemberBranchLabel(member)}</div>
+                                                                <div className="text-[12px] text-[#676879] truncate mt-0.5">{getMemberDepartmentLabel(member)}</div>
+                                                            </div>
+                                                            <div className="min-w-0 flex flex-col justify-center">
+                                                                <div className="text-[12px] text-[#676879] truncate">เบอร์โทร: <span className="text-[13px] text-[#323338] font-medium">{member.phone || '-'}</span></div>
+                                                                <div className="text-[12px] text-[#676879] truncate mt-0.5">LINE: <span className="text-[13px] text-[#00b900] font-medium">{member.lineUserId || '-'}</span></div>
+                                                            </div>
+                                                            <div className="min-w-0 flex flex-col justify-center">
+                                                                <div className="text-[12px] text-[#676879] truncate">กำลังรับงาน: <span className="text-[#323338] font-medium">{capacity} ชม./สัปดาห์</span></div>
+                                                                <div className={overloaded ? 'text-[12px] font-semibold truncate text-[#e2445c] mt-0.5' : 'text-[12px] font-medium truncate text-[#0052cc] mt-0.5'}>สัปดาห์นี้รับแล้ว: {load.assignedHours} ชม. ({load.taskCount} งาน)</div>
+                                                            </div>
                                                         </>
                                                     )}
                                                 </div>
@@ -927,6 +882,154 @@ export default function UserManagementView({
                                 {isDeletingMember && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                                 ลบ
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {isAddModalOpen && (
+                <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-[1px] flex items-center justify-center p-4">
+                    <div className="w-full max-w-2xl bg-white rounded-xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+                        <div className="px-5 py-4 border-b border-[#e6e9ef] flex items-center justify-between bg-[#fdfdfe]">
+                            <h3 className="text-[18px] font-bold text-[#323338]">เพิ่มผู้ใช้ระบบ หรือพนักงานใหม่</h3>
+                            <button onClick={() => setIsAddModalOpen(false)} className="text-[#676879] hover:bg-[#f5f6f8] p-1.5 rounded-lg transition-colors"><X className="w-5 h-5"/></button>
+                        </div>
+                        <div className="p-5 overflow-y-auto">
+                            <div className="flex gap-2 p-1 bg-[#f5f6f8] rounded-lg mb-6 w-fit mx-auto border border-[#e6e9ef]">
+                                <button type="button" onClick={() => setMemberTab('team')} className={memberTab !== 'system' ? "px-5 py-1.5 rounded-md bg-white shadow-sm text-sm font-semibold text-[#0073ea]" : "px-5 py-1.5 rounded-md text-sm font-semibold text-[#676879] hover:bg-black/5 transition-colors"}>พนักงาน (ช่าง/ทีม)</button>
+                                <button type="button" onClick={() => setMemberTab('system')} className={memberTab === 'system' ? "px-5 py-1.5 rounded-md bg-white shadow-sm text-sm font-semibold text-[#0073ea]" : "px-5 py-1.5 rounded-md text-sm font-semibold text-[#676879] hover:bg-black/5 transition-colors"}>ผู้ดูแลระบบ (แอดมิน)</button>
+                            </div>
+
+                            {memberTab !== 'system' ? (
+                                <div className="space-y-4">
+                                    <div className="flex justify-center mb-4">
+                                        <div className="shrink-0 relative">
+                                            <input type="file" accept="image/*" ref={newAvatarRef} onChange={handleNewAvatarUpload} className="hidden" />
+                                            <button onClick={() => newAvatarRef.current?.click()} className="relative group" title="อัปโหลดรูปภาพ">
+                                                {newMemberAvatar ? (
+                                                    <div className="relative">
+                                                        <img src={newMemberAvatar} alt="รูปพนักงานใหม่" className="w-[80px] h-[80px] rounded-full object-cover border-2 border-[#0073ea] shadow-sm" />
+                                                        <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                            <Camera className="w-6 h-6 text-white" />
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-[80px] h-[80px] rounded-full bg-[#fdfdfe] border-2 border-dashed border-[#a0a2b1] flex items-center justify-center text-[#a0a2b1] hover:border-[#0073ea] hover:bg-[#f5f6f8] transition-colors shadow-sm">
+                                                        <ImagePlus className="w-8 h-8" />
+                                                    </div>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-[12px] font-medium text-[#323338]">ประเภทพนักงาน</label>
+                                            <select value={newMemberType} onChange={(e) => setNewMemberType(e.target.value as MemberType)} className="w-full bg-[#fdfdfe] border border-[#d0d4e4] rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#0073ea] text-[13px] shadow-sm">
+                                                <option value="team">พนักงานประจำ</option>
+                                                <option value="crew">พนักงานชั่วคราว</option>
+                                            </select>
+                                        </div>
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-[12px] font-medium text-[#323338]">ชื่อ - นามสกุล</label>
+                                            <input value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} placeholder="ชื่อพนักงาน" className="w-full bg-[#fdfdfe] border border-[#d0d4e4] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0073ea] text-[13px] shadow-sm" />
+                                        </div>
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-[12px] font-medium text-[#323338]">สาขาหน่วยงาน</label>
+                                            <select value={newMemberBranchId} onChange={(e) => setNewMemberBranchId(e.target.value)} className="w-full bg-[#fdfdfe] border border-[#d0d4e4] rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#0073ea] text-[13px] shadow-sm">
+                                                {branchOptions.map((option) => (
+                                                    <option key={option.id} value={option.id}>{option.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-[12px] font-medium text-[#323338]">แผนก / รหัสสายงาน</label>
+                                            <select value={newMemberDepartmentId} onChange={(e) => setNewMemberDepartmentId(e.target.value)} className="w-full bg-[#fdfdfe] border border-[#d0d4e4] rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#0073ea] text-[13px] shadow-sm">
+                                                {newMemberDepartmentOptions.map((option) => (
+                                                    <option key={option.id} value={option.id}>{option.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-[12px] font-medium text-[#323338]">เบอร์โทรศัพท์ติดต่อ (ถ้ามี)</label>
+                                            <input value={newMemberPhone} onChange={(e) => setNewMemberPhone(e.target.value)} placeholder="ตัวอย่าง: 08x-xxxxxxx" className="w-full bg-[#fdfdfe] border border-[#d0d4e4] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0073ea] text-[13px] shadow-sm" />
+                                        </div>
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-[12px] font-medium text-[#323338]">ไอดี LINE (เพื่อรับการแจ้งเตือน)</label>
+                                            <input value={newMemberLineUserId} onChange={(e) => setNewMemberLineUserId(e.target.value)} placeholder="LINE User ID (U...)" className="w-full bg-[#fdfdfe] border border-[#d0d4e4] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0073ea] text-[13px] shadow-sm" />
+                                        </div>
+                                        <div className="flex flex-col gap-1.5 md:col-span-2">
+                                            <label className="text-[12px] font-medium text-[#323338]">ความสามารถในการรับงาน (ชั่วโมง/สัปดาห์)</label>
+                                            <input type="number" min="1" max="168" value={newMemberCapacity} onChange={(e) => setNewMemberCapacity(e.target.value)} placeholder="ค่าเริ่มต้น: 48" className="w-full bg-[#fdfdfe] border border-[#d0d4e4] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0073ea] text-[13px] shadow-sm" />
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-[12px] font-medium text-[#323338]">ชื่อ-นามสกุล ที่แสดง</label>
+                                            <input value={newSystemDisplayName} onChange={(e) => setNewSystemDisplayName(e.target.value)} placeholder="ชื่อบุคคล หรือ นิติบุคคล" className="w-full bg-[#fdfdfe] border border-[#d0d4e4] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0073ea] text-[13px] shadow-sm" />
+                                        </div>
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-[12px] font-medium text-[#323338]">ชื่อผู้เข้าใช้ (Username)</label>
+                                            <input value={newSystemUsername} onChange={(e) => setNewSystemUsername(e.target.value)} placeholder="Username" className="w-full bg-[#fdfdfe] border border-[#d0d4e4] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0073ea] text-[13px] shadow-sm" />
+                                        </div>
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-[12px] font-medium text-[#323338]">อีเมลหลัก</label>
+                                            <input value={newSystemEmail} onChange={(e) => setNewSystemEmail(e.target.value)} placeholder="test@example.com" className="w-full bg-[#fdfdfe] border border-[#d0d4e4] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0073ea] text-[13px] shadow-sm" />
+                                        </div>
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-[12px] font-medium text-[#323338]">เบอร์โทรศัพท์ติดต่อ</label>
+                                            <input value={newSystemPhone} onChange={(e) => setNewSystemPhone(e.target.value)} placeholder="08x-xxxxxxx" className="w-full bg-[#fdfdfe] border border-[#d0d4e4] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0073ea] text-[13px] shadow-sm" />
+                                        </div>
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-[12px] font-medium text-[#323338]">ประเภทการล็อกอิน</label>
+                                            <select value={newSystemProvider} onChange={(e) => {
+                                                const nextProvider = e.target.value as SystemUserAccount['authProvider'];
+                                                setNewSystemProvider(nextProvider);
+                                                if (nextProvider === 'line') {
+                                                    setNewSystemPassword('');
+                                                }
+                                            }} className="w-full bg-[#fdfdfe] border border-[#d0d4e4] rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#0073ea] text-[13px] shadow-sm">
+                                                <option value="password">ใช้ชื่อผู้ใช้และรหัสผ่าน (ปกติ)</option>
+                                                <option value="line">ใช้การล็อกอินผ่านบัญชีไลน์ (LINE)</option>
+                                            </select>
+                                        </div>
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-[12px] font-medium text-[#323338]">รหัสผ่านเข้าใช้งาน</label>
+                                            <input type="password" value={newSystemPassword} onChange={(e) => setNewSystemPassword(e.target.value)} placeholder={newSystemProvider === 'password' ? 'ไม่ต่ำกว่า 6 ตัวอักษร' : 'ไม่ต้องระบุ (ใช้การล็อกอินผ่านไลน์)'} disabled={newSystemProvider !== 'password'} className="w-full bg-[#fdfdfe] border border-[#d0d4e4] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0073ea] text-[13px] disabled:bg-[#f5f6f8] disabled:text-[#a0a2b1] shadow-sm" />
+                                        </div>
+                                    </div>
+                                    <div className="bg-[#f5f6f8] rounded-xl p-4 border border-[#e6e9ef] grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-[12px] font-medium text-[#323338]">สิทธิ์การจัดการในระบบ</label>
+                                            <select value={newSystemRole} onChange={(e) => setNewSystemRole(e.target.value as SystemUserRole)} className="w-full bg-white border border-[#d0d4e4] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0073ea] text-[13px] shadow-sm">
+                                                {SYSTEM_ROLE_OPTIONS.map((option) => (
+                                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-[12px] font-medium text-[#323338]">ไอดี LINE ส่วนตัวรับออโต้รีพอร์ต</label>
+                                            <input value={newSystemLineUserId} onChange={(e) => setNewSystemLineUserId(e.target.value)} placeholder="LINE User ID (U...)" className="w-full bg-white border border-[#d0d4e4] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0073ea] text-[13px] shadow-sm" />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        <div className="px-5 py-4 border-t border-[#e6e9ef] bg-[#fdfdfe] flex items-center justify-end gap-3">
+                            <button onClick={() => setIsAddModalOpen(false)} className="px-5 py-2 rounded-lg text-[13px] font-medium bg-white border border-[#d0d4e4] text-[#323338] hover:bg-[#f5f6f8] transition-colors shadow-sm">
+                                ยกเลิก
+                            </button>
+                            {memberTab !== 'system' ? (
+                                <button onClick={handleAddMember} disabled={!newMemberName.trim()} className="bg-[#0073ea] hover:bg-[#0060c0] disabled:bg-[#d0d4e4] disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg text-[13px] font-medium transition-colors shadow-sm">
+                                    บันทึกข้อมูลพนักงาน
+                                </button>
+                            ) : (
+                                <button type="button" onClick={() => void handleAddSystemUserSubmit()} disabled={!newSystemDisplayName.trim() || !newSystemUsername.trim() || !newSystemEmail.trim() || (newSystemProvider === 'password' && newSystemPassword.trim().length < 6)} className="bg-[#334155] hover:bg-[#1f2937] disabled:bg-[#d0d4e4] disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg text-[13px] font-medium transition-colors shadow-sm">
+                                    บันทึกบัญชีผู้ดูแลระบบ
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

@@ -230,7 +230,13 @@ export interface NotificationSettings {
     notifyTaskStatusChanged: boolean;
     notifyTaskCommentAdded: boolean;
     lineAdminUserId: string;
-    lineReportType: 'project-summary' | 'today-team-load' | 'completed-last-2-days';
+    lineAdminGroupId: string;
+    adminReportProjectSummary: boolean;
+    adminReportTeamLoad: boolean;
+    adminReportCompleted: boolean;
+    adminReportFrequency?: 'daily' | 'weekly';
+    adminReportDayOfWeek?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+    adminReportTime?: string;
     employeeReportEnabled: boolean;
     employeeReportFrequency: 'daily' | 'weekly';
     employeeReportDayOfWeek: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
@@ -246,6 +252,7 @@ export interface NotificationSettings {
     employeeReportMaxItems: number;
     employeeReportDueSoonDays: number;
     employeeReportTestMemberId: string;
+    gasWebhookUrl?: string;
 }
 
 export interface ScopeBranch {
