@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
 const LINE_PUSH_URL = 'https://api.line.me/v2/bot/message/push';
+const BANGKOK_TIMEZONE = 'Asia/Bangkok';
 
 type NotifyAction = 'assigned' | 'status_changed' | 'comment_added' | 'deadline_warning' | 'overdue';
 
@@ -73,8 +74,18 @@ const ALLOWED_ACTIONS = new Set<NotifyAction>([
     'overdue',
 ]);
 
-function pad2(value: number): string {
-    return String(value).padStart(2, '0');
+function formatBangkokDate(value: Date): string {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: BANGKOK_TIMEZONE,
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+    }).formatToParts(value);
+
+    const day = parts.find((part) => part.type === 'day')?.value ?? '00';
+    const month = parts.find((part) => part.type === 'month')?.value ?? '00';
+    const year = parts.find((part) => part.type === 'year')?.value ?? '0000';
+    return `${day}-${month}-${year}`;
 }
 
 function formatDateDdMmYyyy(value: Date | string | undefined): string {
@@ -88,9 +99,9 @@ function formatDateDdMmYyyy(value: Date | string | undefined): string {
         }
         const parsed = new Date(trimmed);
         if (Number.isNaN(parsed.getTime())) return trimmed;
-        return `${pad2(parsed.getDate())}-${pad2(parsed.getMonth() + 1)}-${parsed.getFullYear()}`;
+        return formatBangkokDate(parsed);
     }
-    return `${pad2(value.getDate())}-${pad2(value.getMonth() + 1)}-${value.getFullYear()}`;
+    return formatBangkokDate(value);
 }
 
 function formatTimelineLabel(value?: string): string {

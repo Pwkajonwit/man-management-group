@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { addDays, format, isPast } from 'date-fns';
 import { AlertTriangle, CalendarDays, CheckCircle2, Clock3, ListTodo, UserRound } from 'lucide-react';
@@ -109,9 +109,14 @@ export default function MobileMyTasksView({
     } | null>(null);
     const [isChangingStatus, setIsChangingStatus] = useState(false);
     const [impersonatedMemberId, setImpersonatedMemberId] = useState('');
+    const [profileImageFailed, setProfileImageFailed] = useState(false);
     const { user, logoutUser } = useAuth();
     const profileName = user?.displayName || currentUserName || 'User';
     const profileInitial = profileName.substring(0, 2).toUpperCase();
+
+    useEffect(() => {
+        setProfileImageFailed(false);
+    }, [user?.pictureUrl]);
     const branchLabelById = useMemo(
         () => new Map(branchOptions.map((option) => [option.id, option.label])),
         [branchOptions]
@@ -258,8 +263,8 @@ export default function MobileMyTasksView({
     };
 
     return (
-        <div className="min-h-screen bg-[radial-gradient(circle_at_top,#f6f9fc_0%,#eef3f8_42%,#e8eef5_100%)]">
-            <header className="sticky top-0 z-20 bg-gradient-to-r from-[#00675e] via-[#1b8930] to-[#066a5b] p-4 shadow-[0_12px_28px_rgba(12,34,58,0.2)]">
+        <div className="min-h-screen bg-[#eef3f8]">
+            <header className="sticky top-0 z-20 bg-green-600 p-4 shadow-[0_12px_28px_rgba(12,34,58,0.2)]">
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-[16px] font-bold text-white tracking-[0.02em]">POWERTEC ENGINEERING CO., LTD.</h1>
@@ -271,16 +276,17 @@ export default function MobileMyTasksView({
                         <button
                             type="button"
                             onClick={() => setShowProfileCard((prev) => !prev)}
-                            className="w-10 h-10 rounded-full border border-white bg-gradient-to-r from-[#6ab04c] via-[#6ab04c] to-[#badc58] hover:bg-[#325b82] transition-colors overflow-hidden flex items-center justify-center"
+                            className="w-10 h-10 rounded-full border border-white bg-[#6ab04c] hover:bg-[#325b82] transition-colors overflow-hidden flex items-center justify-center"
                             aria-label="โปรไฟล์"
                             title="โปรไฟล์"
                         >
-                            {user?.pictureUrl ? (
+                            {user?.pictureUrl && !profileImageFailed ? (
                                 <img
                                     src={user.pictureUrl}
                                     alt={profileName}
                                     referrerPolicy="no-referrer"
                                     className="w-full h-full object-cover"
+                                    onError={() => setProfileImageFailed(true)}
                                 />
                             ) : (
                                 <span className="text-[11px] font-bold text-[#f0f6ff]">{profileInitial}</span>
@@ -464,7 +470,7 @@ export default function MobileMyTasksView({
 
                                 <div className="mt-2 h-2 rounded-full bg-[#e5edf6] overflow-hidden">
                                     <div
-                                        className="h-full rounded-full bg-gradient-to-r from-[#2f5f90] via-[#3b75b1] to-[#4a8ac9]"
+                                        className="h-full rounded-full bg-green-600"
                                         style={{ width: `${progress}%` }}
                                     />
                                 </div>
@@ -493,7 +499,7 @@ export default function MobileMyTasksView({
                                     <button
                                         onClick={() => requestStatusChange(task, 'in-progress')}
                                         className={`text-[11px] px-2.5 py-1.5 rounded-md font-semibold border transition-all ${isWorking
-                                                ? 'bg-gradient-to-r from-[#ffb347] to-[#ff8f1f] text-white border-[#e37b16] shadow-[0_3px_10px_rgba(255,143,31,0.35)]'
+                                                ? 'bg-[#ff8f1f] text-white border-[#e37b16] shadow-[0_3px_10px_rgba(255,143,31,0.35)]'
                                                 : 'bg-[#fff4e8] text-[#9b5b16] border-[#ffd1a2] hover:bg-[#ffe9d3]'
                                             }`}
                                     >
@@ -502,10 +508,10 @@ export default function MobileMyTasksView({
                                     <button
                                         onClick={() => requestStatusChange(task, 'completed')}
                                         className={`text-[11px] px-2.5 py-1.5 rounded-md font-semibold border transition-all ${isDone
-                                                ? 'bg-gradient-to-r from-[#2acb7a] to-[#0cae5f] text-white border-[#0e9a58] shadow-[0_3px_10px_rgba(12,174,95,0.32)]'
+                                                ? 'bg-[#0cae5f] text-white border-[#0e9a58] shadow-[0_3px_10px_rgba(12,174,95,0.32)]'
                                                 : 'bg-[#e9f9f0] text-[#0f8a52] border-[#bde8d0] hover:bg-[#dff4e9]'
                                             }`}
-                                    >
+                                    >เ
                                         เสร็จสิ้น
                                     </button>
                                     <Link

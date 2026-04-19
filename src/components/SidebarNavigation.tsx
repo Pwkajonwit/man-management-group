@@ -51,6 +51,11 @@ export default function SidebarNavigation({ mobile = false, onNavigate }: Sideba
     const [collapseScope, setCollapseScope] = useState(true);
     const [collapseWorkspaces, setCollapseWorkspaces] = useState(false);
     const [hideCompletedWorkspaces, setHideCompletedWorkspaces] = useState(true);
+    const [profileImageFailed, setProfileImageFailed] = useState(false);
+
+    useEffect(() => {
+        setProfileImageFailed(false);
+    }, [user?.pictureUrl]);
 
     const navItems = [
         { href: '/dashboard', label: 'แดชบอร์ด', icon: BarChart3, match: '/dashboard' },
@@ -318,12 +323,13 @@ export default function SidebarNavigation({ mobile = false, onNavigate }: Sideba
 
             <div className="relative z-10 border-t border-white/12 p-4 bg-[#0b1826]/70 backdrop-blur-sm">
                 <div className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-white/5 px-2.5 py-2">
-                    {user?.pictureUrl ? (
+                    {user?.pictureUrl && !profileImageFailed ? (
                         <img
                             src={user.pictureUrl}
                             alt={user.displayName}
                             referrerPolicy="no-referrer"
                             className="w-9 h-9 rounded-full object-cover border border-[#8fb0cf]/70 shadow-sm"
+                            onError={() => setProfileImageFailed(true)}
                         />
                     ) : (
                         <div className="w-9 h-9 rounded-full bg-[#27405a] border border-[#7f9bb8]/70 flex items-center justify-center text-[12px] font-semibold text-[#e6eef7]">

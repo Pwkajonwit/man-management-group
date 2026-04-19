@@ -233,11 +233,11 @@ export default function UserTaskDetailPage() {
 
     return (
         <div className="min-h-screen bg-[radial-gradient(circle_at_top,#f7faff_0%,#eef3f8_45%,#e8eef5_100%)]">
-            <header className="sticky top-0 z-20  bg-gradient-to-r from-[#00675e] via-[#1b8930] to-[#066a5b] p-4  border-b border-[#2a4a68] shadow-[0_6px_18px_rgba(14,33,52,0.35)]">
+            <header className="sticky top-0 z-20  bg-green-600 p-4  border-b border-[#2a4a68] shadow-[0_6px_18px_rgba(14,33,52,0.35)]">
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => router.push('/me')}
-                        className="p-2 rounded-lg bg-white/15 text-white hover:bg-white/25 transition-colors"
+                        className="p-2 rounded-lg bg-white/30 text-white hover:bg-white/25 transition-colors"
                         aria-label="กลับ"
                     >
                         <ArrowLeft className="w-4 h-4" />

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
 const LINE_PUSH_URL = 'https://api.line.me/v2/bot/message/push';
+const BANGKOK_TIMEZONE = 'Asia/Bangkok';
 
 interface EmployeeReportPayload {
     to: string;
@@ -153,12 +154,29 @@ function dayDiff(start: Date, end: Date): number {
     return Math.floor(ms / 86400000);
 }
 
+function getTaskDateRange(task: EmployeeReportPayload['tasks'][number], fallbackDate: Date): { start: Date; end: Date } {
+    const start = parseDate(task.startDate) || parseDate(task.dueDate) || fallbackDate;
+    const end = parseDate(task.endDate) || parseDate(task.dueDate) || start;
+
+    return start.getTime() <= end.getTime()
+        ? { start, end }
+        : { start: end, end: start };
+}
+
 function buildTimelineSection(
     tasks: EmployeeReportPayload['tasks'],
     today: Date,
     projectTitle?: string
-): FlexBoxNode {
+): FlexBoxNode | null {
     const timelineDays = Array.from({ length: 5 }, (_, idx) => addDays(today, idx - 2));
+    const timelineStart = dayStart(timelineDays[0] || today);
+    const timelineEnd = dayStart(timelineDays[timelineDays.length - 1] || today);
+    const visibleTasks = tasks.filter((task) => {
+        const { start, end } = getTaskDateRange(task, today);
+        return dayStart(end).getTime() >= timelineStart.getTime()
+            && dayStart(start).getTime() <= timelineEnd.getTime();
+    });
+    if (visibleTasks.length === 0) return null;
 
     const headerDays: FlexBoxNode = {
         type: 'box',
@@ -182,11 +200,8 @@ function buildTimelineSection(
         })),
     };
 
-    const rows = tasks.slice(0, 3).map((task, index) => {
-        const start = parseDate(task.startDate) || parseDate(task.dueDate) || today;
-        const end = parseDate(task.endDate) || parseDate(task.dueDate) || start;
-        const normalizedStart = start.getTime() <= end.getTime() ? start : end;
-        const normalizedEnd = start.getTime() <= end.getTime() ? end : start;
+    const rows = visibleTasks.slice(0, 3).map((task, index) => {
+        const { start: normalizedStart, end: normalizedEnd } = getTaskDateRange(task, today);
         // Duration in the timeline is inclusive of both start and end dates.
         const duration = Math.max(1, dayDiff(normalizedStart, normalizedEnd) + 1);
 
@@ -331,10 +346,23 @@ function groupTasksByProject(tasks: EmployeeReportPayload['tasks']) {
     return Array.from(grouped.entries()).map(([projectName, items]) => ({ projectName, tasks: items }));
 }
 
+function formatBangkokDateTime(date: Date): string {
+    return new Intl.DateTimeFormat('th-TH', {
+        timeZone: BANGKOK_TIMEZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+    }).format(date);
+}
+
 function buildFlexMessage(payload: EmployeeReportPayload) {
     const groupedProjectTasks = groupTasksByProject(payload.tasks);
     const multiProjectMode = groupedProjectTasks.length > 1;
-    const generatedAt = new Date().toLocaleString('th-TH', { hour12: false });
+    const generatedAt = formatBangkokDateTime(new Date());
     const summaryCards: FlexBoxNode[] = [
         {
             type: 'box',
@@ -451,20 +479,29 @@ function buildFlexMessage(payload: EmployeeReportPayload) {
 
     if (payload.tasks.length > 0) {
         if (payload.template === 'detailed') {
+            const reportDate = dayStart(new Date());
             if (multiProjectMode) {
-                bodyContents.push({
-                    type: 'text',
-                    text: 'แบ่งตามโครงการ',
-                    size: 'sm',
-                    weight: 'bold',
-                    color: '#374151',
-                    margin: 'md',
-                });
-                groupedProjectTasks.slice(0, 3).forEach((group) => {
-                    bodyContents.push(buildTimelineSection(group.tasks, dayStart(new Date()), group.projectName));
-                });
+                const projectTimelineSections: FlexBoxNode[] = [];
+                for (const group of groupedProjectTasks) {
+                    const section = buildTimelineSection(group.tasks, reportDate, group.projectName);
+                    if (section) projectTimelineSections.push(section);
+                    if (projectTimelineSections.length >= 3) break;
+                }
+
+                if (projectTimelineSections.length > 0) {
+                    bodyContents.push({
+                        type: 'text',
+                        text: 'แบ่งตามโครงการ',
+                        size: 'sm',
+                        weight: 'bold',
+                        color: '#374151',
+                        margin: 'md',
+                    });
+                    bodyContents.push(...projectTimelineSections);
+                }
             } else {
-                bodyContents.push(buildTimelineSection(payload.tasks, dayStart(new Date())));
+                const section = buildTimelineSection(payload.tasks, reportDate);
+                if (section) bodyContents.push(section);
             }
         } else {
             bodyContents.push({

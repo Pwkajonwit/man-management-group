@@ -400,14 +400,16 @@ export default function UserManagementView({
         }
     };
 
-    const AvatarDisplay = ({ member, size = 40, className = '' }: { member: TeamMember | { name: string; avatar?: string }; size?: number; className?: string }) => (
-        member.avatar ? (
+    const AvatarDisplay = ({ member, size = 40, className = '' }: { member: TeamMember | { name: string; avatar?: string }; size?: number; className?: string }) => {
+        const [imageFailed, setImageFailed] = useState(false);
+        return member.avatar && !imageFailed ? (
             <img
                 src={member.avatar}
                 alt={member.name}
                 referrerPolicy="no-referrer"
                 className={`rounded-full object-cover border-2 border-white shadow-sm ${className}`}
                 style={{ width: size, height: size }}
+                onError={() => setImageFailed(true)}
             />
         ) : (
             <div
@@ -416,8 +418,8 @@ export default function UserManagementView({
             >
                 {member.name.substring(0, 2).toUpperCase()}
             </div>
-        )
-    );
+        );
+    };
 
     const copyText = async (text: string) => {
         if (navigator.clipboard?.writeText) {
@@ -1037,5 +1039,4 @@ export default function UserManagementView({
         </div>
     );
 }
-
 

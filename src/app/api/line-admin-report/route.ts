@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
 const LINE_ADMIN_USER_ID_FROM_ENV = process.env.LINE_ADMIN_USER_ID || '';
 const LINE_PUSH_URL = 'https://api.line.me/v2/bot/message/push';
+const BANGKOK_TIMEZONE = 'Asia/Bangkok';
 
 interface ReportPayload {
     projectName: string;
@@ -62,15 +63,21 @@ type FlexButtonNode = {
     height?: 'sm' | 'md';
 };
 
+type FlexFillerNode = {
+    type: 'filler';
+};
+
 type FlexBoxNode = {
     type: 'box';
     layout: 'vertical' | 'horizontal';
-    contents: Array<FlexTextNode | FlexBoxNode | FlexButtonNode>;
+    contents: Array<FlexTextNode | FlexBoxNode | FlexButtonNode | FlexFillerNode>;
     margin?: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'xxl';
     paddingAll?: string;
     backgroundColor?: string;
     cornerRadius?: string;
     flex?: number;
+    width?: string;
+    height?: string;
     spacing?: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'xxl';
 };
 
@@ -165,9 +172,26 @@ function isValidReportPayload(body: unknown): body is ReportPayload {
     return requiredKeys.every((key) => typeof metrics[key] === 'number' && Number.isFinite(metrics[key] as number));
 }
 
+function formatBangkokDateTime(date: Date): string {
+    return new Intl.DateTimeFormat('th-TH', {
+        timeZone: BANGKOK_TIMEZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+    }).format(date);
+}
+
 function buildFlexMessage(payload: ReportPayload): FlexMessage {
-    const generatedAt = new Date().toLocaleString('th-TH', { hour12: false });
+    const generatedAt = formatBangkokDateTime(new Date());
     const reportType = payload.reportType || 'project-summary';
+    const totalTasks = Math.max(0, payload.metrics.totalTasks);
+    const completedTasks = Math.min(Math.max(0, payload.metrics.completed), totalTasks);
+    const projectProgressPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    const filledProgressSegments = Math.round(projectProgressPercent / 10);
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL || '').trim().replace(/\/$/, '') || 'https://your-app.vercel.app';
     const liffId = (process.env.NEXT_PUBLIC_LIFF_ID || '').trim();
     const reportPath = `/reports/admin?type=${encodeURIComponent(reportType)}${payload.projectId ? `&projectId=${encodeURIComponent(payload.projectId)}` : ''}`;
@@ -189,6 +213,15 @@ function buildFlexMessage(payload: ReportPayload): FlexMessage {
         ],
     });
 
+    const progressBarSegments: FlexBoxNode[] = Array.from({ length: 10 }, (_, index) => ({
+        type: 'box',
+        layout: 'vertical',
+        flex: 1,
+        height: '10px',
+        backgroundColor: index < filledProgressSegments ? meta.color : '#E2E8F0',
+        contents: [{ type: 'filler' }],
+    }));
+
     const bodyContents: Array<FlexTextNode | FlexBoxNode | FlexButtonNode> = [
         {
             type: 'box',
@@ -209,6 +242,40 @@ function buildFlexMessage(payload: ReportPayload): FlexMessage {
                     ],
                 },
                 { type: 'text', text: `สร้างเมื่อ: ${generatedAt}`, size: 'xs', color: '#475467', margin: 'sm' },
+            ],
+        },
+        {
+            type: 'box',
+            layout: 'vertical',
+            margin: 'md',
+            paddingAll: '12px',
+            backgroundColor: '#F8FAFC',
+            cornerRadius: '10px',
+            spacing: 'sm',
+            contents: [
+                {
+                    type: 'box',
+                    layout: 'horizontal',
+                    contents: [
+                        { type: 'text', text: 'ความคืบหน้าโครงการ', size: 'sm', color: '#334155', weight: 'bold', wrap: true },
+                        { type: 'text', text: `${projectProgressPercent}%`, size: 'xl', color: meta.color, weight: 'bold', align: 'end' },
+                    ],
+                },
+                {
+                    type: 'box',
+                    layout: 'horizontal',
+                    height: '10px',
+                    backgroundColor: '#E2E8F0',
+                    cornerRadius: '5px',
+                    contents: progressBarSegments,
+                },
+                {
+                    type: 'text',
+                    text: `เสร็จสิ้น ${completedTasks}/${totalTasks} งาน`,
+                    size: 'xs',
+                    color: '#475467',
+                    wrap: true,
+                },
             ],
         },
         {

@@ -89,10 +89,11 @@ function mapFirebaseUser(firebaseUser: FirebaseUser): AuthUser {
 function mapTeamMemberToAuthUser(member: TeamMember, lineUserId?: string, pictureUrl?: string): AuthUser {
     const branchId = member.branchId || DEFAULT_BRANCH_ID;
     const departmentId = member.departmentId || DEFAULT_DEPARTMENT_ID;
+    const resolvedPictureUrl = pictureUrl || member.avatar || undefined;
     return {
         uid: lineUserId || member.id,
         displayName: member.name || 'User',
-        pictureUrl,
+        pictureUrl: resolvedPictureUrl,
         lineUserId,
         orgId: member.orgId || DEFAULT_ORG_ID,
         branchId,
@@ -221,6 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         ]);
                         const matchedSystemByLine = systemAccounts.find((account) => account.lineUserId === profile.userId);
                         const matchedByLine = members.find((member) => member.lineUserId === profile.userId);
+                        const linePictureUrl = normalizedPictureUrl || matchedByLine?.avatar;
 
                         if (matchedSystemByLine) {
                             if (matchedByLine && normalizedPictureUrl && matchedByLine.avatar !== normalizedPictureUrl) {
@@ -236,7 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             setPendingLineProfile(null);
                             setRequiresLinePhoneBinding(false);
                             setUser(mergeSystemScope(
-                                mapSystemUserToAuthUser(matchedSystemByLine, profile.userId, normalizedPictureUrl),
+                                mapSystemUserToAuthUser(matchedSystemByLine, profile.userId, linePictureUrl),
                                 matchedSystemByLine
                             ));
                             setLoading(false);
@@ -250,7 +252,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
                             setPendingLineProfile(null);
                             setRequiresLinePhoneBinding(false);
-                            setUser(mapTeamMemberToAuthUser(matchedByLine, profile.userId, normalizedPictureUrl));
+                            setUser(mapTeamMemberToAuthUser(matchedByLine, profile.userId, linePictureUrl));
                             setLoading(false);
                             return;
                         }
@@ -350,6 +352,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         const normalizedPictureUrl = normalizeLinePictureUrl(pendingLineProfile.pictureUrl);
+        const linePictureUrl = normalizedPictureUrl || matchedMember?.avatar;
         if (matchedMember) {
             const memberPatch: Partial<TeamMember> = { lineUserId: pendingLineProfile.userId };
             if (normalizedPictureUrl && matchedMember.avatar !== normalizedPictureUrl) {
@@ -375,7 +378,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 lastLoginAt: new Date().toISOString(),
             };
             setUser(mergeSystemScope(
-                mapSystemUserToAuthUser(updatedSystemUser, pendingLineProfile.userId, normalizedPictureUrl),
+                mapSystemUserToAuthUser(updatedSystemUser, pendingLineProfile.userId, linePictureUrl),
                 updatedSystemUser
             ));
             return;
@@ -385,7 +388,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             throw new Error('Phone number was not found in employees or system users.');
         }
 
-        setUser(mapTeamMemberToAuthUser(matchedMember, pendingLineProfile.userId, normalizedPictureUrl));
+        setUser(mapTeamMemberToAuthUser(matchedMember, pendingLineProfile.userId, linePictureUrl));
     };
 
     const loginWithPassword = async (userOrEmail: string, password: string) => {
