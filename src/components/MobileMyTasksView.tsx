@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { addDays, format, isPast } from 'date-fns';
-import { AlertTriangle, CalendarDays, CheckCircle2, Clock3, ListTodo, UserRound } from 'lucide-react';
+import { AlertTriangle, CalendarDays, CheckCircle2, Clock3, ListTodo, Plus, UserRound, X } from 'lucide-react';
 import { Project, Task, TeamMember } from '@/types/construction';
 import { getStatusColor, getStatusLabel } from '@/utils/statusUtils';
 import { findCurrentTeamMember, getTaskOwnerNames as resolveTaskOwnerNames, isTaskAssignedToCurrentUser } from '@/utils/taskOwnerUtils';
@@ -18,6 +18,7 @@ interface MobileMyTasksViewProps {
     currentUserName: string;
     branchOptions: Array<{ id: string; label: string }>;
     departmentOptions: Array<{ id: string; label: string; branchId?: string }>;
+    onCreateMyTask: (payload: { projectId: string; name: string; description?: string; planEndDate: string }) => Promise<void>;
     onStatusChange: (taskId: string, newStatus: Task['status']) => void;
 }
 
@@ -92,15 +93,23 @@ export default function MobileMyTasksView({
     currentUserName,
     branchOptions,
     departmentOptions,
+    onCreateMyTask,
     onStatusChange,
 }: MobileMyTasksViewProps) {
     const [activeTab, setActiveTab] = useState<FilterTab>('all');
-    const [displayLimit, setDisplayLimit] = useState(20);
+    const [displayLimit, setDisplayLimit] = useState(10);
     const [showProfileCard, setShowProfileCard] = useState(false);
+    const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
+    const [createTaskProjectId, setCreateTaskProjectId] = useState('');
+    const [createTaskName, setCreateTaskName] = useState('');
+    const [createTaskDescription, setCreateTaskDescription] = useState('');
+    const [createTaskEndDate, setCreateTaskEndDate] = useState(() => format(addDays(new Date(), 1), 'yyyy-MM-dd'));
+    const [createTaskError, setCreateTaskError] = useState('');
+    const [isCreatingTask, setIsCreatingTask] = useState(false);
 
     const handleTabChange = (tab: FilterTab) => {
         setActiveTab(tab);
-        setDisplayLimit(20);
+        setDisplayLimit(10);
     };
     const [pendingStatusChange, setPendingStatusChange] = useState<{
         taskId: string;
@@ -182,6 +191,24 @@ export default function MobileMyTasksView({
                 .map((project) => project.id)
         )
     ), [projects]);
+    const createTaskProjects = useMemo(() => (
+        projects
+            .filter((project) => project.status !== 'completed')
+            .slice()
+            .sort((a, b) => a.name.localeCompare(b.name, 'th'))
+    ), [projects]);
+
+    useEffect(() => {
+        if (createTaskProjects.length === 0) {
+            setCreateTaskProjectId('');
+            return;
+        }
+        setCreateTaskProjectId((current) => (
+            createTaskProjects.some((project) => project.id === current)
+                ? current
+                : createTaskProjects[0].id
+        ));
+    }, [createTaskProjects]);
 
     const reportTasks = useMemo(() => (
         tasks.filter((task) => !completedProjectIds.has(task.projectId))
@@ -224,9 +251,20 @@ export default function MobileMyTasksView({
         };
     }, [myTasks]);
 
+    const getTaskCompletionTime = (task: Task): number => {
+        const value = task.actualEndDate || task.updatedAt || task.progressUpdatedAt || task.planEndDate;
+        const time = new Date(value || '').getTime();
+        return Number.isFinite(time) ? time : 0;
+    };
+
     const shownTasks = grouped[activeTab]
         .slice()
-        .sort((a, b) => new Date(a.planEndDate).getTime() - new Date(b.planEndDate).getTime());
+        .sort((a, b) => {
+            if (activeTab === 'done') {
+                return getTaskCompletionTime(b) - getTaskCompletionTime(a);
+            }
+            return new Date(a.planEndDate).getTime() - new Date(b.planEndDate).getTime();
+        });
 
     const visibleTasks = shownTasks.slice(0, displayLimit);
 
@@ -259,6 +297,55 @@ export default function MobileMyTasksView({
             setPendingStatusChange(null);
         } finally {
             setIsChangingStatus(false);
+        }
+    };
+
+    const openCreateTaskModal = () => {
+        setCreateTaskError('');
+        setCreateTaskName('');
+        setCreateTaskDescription('');
+        setCreateTaskEndDate(format(addDays(new Date(), 1), 'yyyy-MM-dd'));
+        setIsCreateTaskOpen(true);
+    };
+
+    const closeCreateTaskModal = () => {
+        if (isCreatingTask) return;
+        setIsCreateTaskOpen(false);
+        setCreateTaskError('');
+    };
+
+    const submitCreateTask = async () => {
+        const taskName = createTaskName.trim();
+        if (!createTaskProjectId) {
+            setCreateTaskError('กรุณาเลือกโปรเจกต์');
+            return;
+        }
+        if (!taskName) {
+            setCreateTaskError('กรุณากรอกชื่องาน');
+            return;
+        }
+        if (!createTaskEndDate) {
+            setCreateTaskError('กรุณาเลือกวันกำหนดเสร็จ');
+            return;
+        }
+
+        try {
+            setIsCreatingTask(true);
+            setCreateTaskError('');
+            await onCreateMyTask({
+                projectId: createTaskProjectId,
+                name: taskName,
+                description: createTaskDescription,
+                planEndDate: createTaskEndDate,
+            });
+            setIsCreateTaskOpen(false);
+            setCreateTaskName('');
+            setCreateTaskDescription('');
+        } catch (error) {
+            console.error('Failed to create my task:', error);
+            setCreateTaskError('ไม่สามารถเพิ่มงานได้ โปรดลองอีกครั้ง');
+        } finally {
+            setIsCreatingTask(false);
         }
     };
 
@@ -323,6 +410,27 @@ export default function MobileMyTasksView({
             </header>
 
             <main className="px-4 py-4 space-y-4 max-w-md mx-auto md:max-w-none md:mx-0 md:p-8">
+                <div className="rounded-xl border border-[#cfd9e6] bg-white p-3 shadow-[0_2px_12px_rgba(30,56,86,0.06)]">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6c7f93]">งานของฉัน</p>
+                            <p className="mt-0.5 text-[13px] font-semibold text-[#1f3147] truncate">{effectiveMemberName}</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={openCreateTaskModal}
+                            disabled={createTaskProjects.length === 0}
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-[#a8b7c8]"
+                        >
+                            <Plus className="h-4 w-4" />
+                            เพิ่มงาน
+                        </button>
+                    </div>
+                    {createTaskProjects.length === 0 && (
+                        <p className="mt-2 text-[12px] text-[#8a5a19]">ยังไม่มีโปรเจกต์ที่เปิดอยู่สำหรับสร้างงาน</p>
+                    )}
+                </div>
+
                 {canImpersonate && (
                     <div className="rounded-xl border border-[#cfd9e6] bg-white p-3 shadow-[0_2px_12px_rgba(30,56,86,0.06)]">
                         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -368,7 +476,7 @@ export default function MobileMyTasksView({
                                 : 'border-[#cfd9e6] hover:border-[#9fb4cc]'
                             }`}
                     >
-                        <div className="text-[10px] uppercase tracking-wider text-[#6e7f92] font-semibold">เปิด</div>
+                        <div className="text-[10px] uppercase tracking-wider text-[#6e7f92] font-semibold">เปิดอยู่</div>
                         <div className="text-[18px] font-black text-[#20374f] mt-1">{stats.total}</div>
                     </button>
                     <button
@@ -529,7 +637,7 @@ export default function MobileMyTasksView({
                         <div className="pt-2">
                             <button
                                 type="button"
-                                onClick={() => setDisplayLimit((prev) => prev + 20)}
+                                onClick={() => setDisplayLimit((prev) => prev + 10)}
                                 className="w-full py-3 rounded-xl border border-[#cfd9e6] bg-white text-[#2b5f95] text-[13px] font-semibold hover:bg-[#f6f9fc] transition-colors shadow-[0_2px_8px_rgba(30,56,86,0.04)]"
                             >
                                 โหลดเพิ่มเติม ({shownTasks.length - displayLimit} รายการ)
@@ -538,6 +646,96 @@ export default function MobileMyTasksView({
                     )}
                 </div>
             </main>
+
+            {isCreateTaskOpen && (
+                <div className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[1px] flex items-center justify-center px-4">
+                    <div className="w-full max-w-sm rounded-xl border border-[#d0dbe8] bg-white shadow-[0_18px_42px_rgba(15,33,53,0.25)]">
+                        <div className="flex items-center justify-between gap-3 border-b border-[#e4ebf4] px-4 py-3">
+                            <h3 className="text-[15px] font-bold text-[#1f3147]">เพิ่มงานของฉัน</h3>
+                            <button
+                                type="button"
+                                onClick={closeCreateTaskModal}
+                                disabled={isCreatingTask}
+                                className="rounded-md p-1 text-[#5f7084] hover:bg-[#eef3f8] disabled:opacity-60"
+                                aria-label="ปิด"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                        <div className="space-y-3 px-4 py-3">
+                            <label className="block">
+                                <span className="text-[12px] font-semibold text-[#42586f]">โปรเจกต์</span>
+                                <select
+                                    value={createTaskProjectId}
+                                    onChange={(event) => setCreateTaskProjectId(event.target.value)}
+                                    disabled={isCreatingTask || createTaskProjects.length <= 1}
+                                    className="mt-1 w-full rounded-lg border border-[#cfd9e6] bg-[#f8fbff] px-3 py-2 text-[13px] text-[#1f3147] outline-none focus:border-[#2f5f90] focus:ring-2 focus:ring-[#2f5f90]/15 disabled:text-[#61738a]"
+                                >
+                                    {createTaskProjects.map((project) => (
+                                        <option key={project.id} value={project.id}>
+                                            {project.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="block">
+                                <span className="text-[12px] font-semibold text-[#42586f]">ชื่องาน</span>
+                                <input
+                                    type="text"
+                                    value={createTaskName}
+                                    onChange={(event) => setCreateTaskName(event.target.value)}
+                                    disabled={isCreatingTask}
+                                    placeholder="เช่น ตรวจหน้างานชั้น 2"
+                                    className="mt-1 w-full rounded-lg border border-[#cfd9e6] bg-white px-3 py-2 text-[13px] text-[#1f3147] outline-none focus:border-[#2f5f90] focus:ring-2 focus:ring-[#2f5f90]/15 disabled:bg-[#f4f7fb]"
+                                />
+                            </label>
+                            <label className="block">
+                                <span className="text-[12px] font-semibold text-[#42586f]">รายละเอียดงาน</span>
+                                <textarea
+                                    value={createTaskDescription}
+                                    onChange={(event) => setCreateTaskDescription(event.target.value)}
+                                    disabled={isCreatingTask}
+                                    placeholder="รายละเอียดที่ต้องทำ สถานที่ หรือหมายเหตุ"
+                                    className="mt-1 min-h-[88px] w-full resize-y rounded-lg border border-[#cfd9e6] bg-white px-3 py-2 text-[13px] text-[#1f3147] outline-none focus:border-[#2f5f90] focus:ring-2 focus:ring-[#2f5f90]/15 disabled:bg-[#f4f7fb]"
+                                />
+                            </label>
+                            <label className="block">
+                                <span className="text-[12px] font-semibold text-[#42586f]">กำหนดเสร็จ</span>
+                                <input
+                                    type="date"
+                                    value={createTaskEndDate}
+                                    onChange={(event) => setCreateTaskEndDate(event.target.value)}
+                                    disabled={isCreatingTask}
+                                    className="mt-1 w-full rounded-lg border border-[#cfd9e6] bg-white px-3 py-2 text-[13px] text-[#1f3147] outline-none focus:border-[#2f5f90] focus:ring-2 focus:ring-[#2f5f90]/15 disabled:bg-[#f4f7fb]"
+                                />
+                            </label>
+                            {createTaskError && (
+                                <p className="rounded-lg border border-[#f2c5cf] bg-[#fff4f6] px-3 py-2 text-[12px] font-semibold text-[#b33c55]">
+                                    {createTaskError}
+                                </p>
+                            )}
+                        </div>
+                        <div className="flex items-center justify-end gap-2 border-t border-[#e4ebf4] px-4 py-3">
+                            <button
+                                type="button"
+                                onClick={closeCreateTaskModal}
+                                disabled={isCreatingTask}
+                                className="rounded-md border border-[#d3ddeb] bg-[#f1f5fa] px-3 py-1.5 text-[12px] font-semibold text-[#24425f] hover:bg-[#e6edf6] disabled:opacity-60"
+                            >
+                                ยกเลิก
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => void submitCreateTask()}
+                                disabled={isCreatingTask}
+                                className="rounded-md bg-green-600 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-green-700 disabled:opacity-60"
+                            >
+                                {isCreatingTask ? 'กำลังเพิ่ม...' : 'เพิ่มงาน'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {pendingStatusChange && (
                 <div className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[1px] flex items-center justify-center px-4">

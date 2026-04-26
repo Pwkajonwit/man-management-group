@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { addDays, isPast } from 'date-fns';
@@ -82,10 +82,12 @@ export default function UserTaskDetailPage() {
         addSubTask,
         toggleSubTask,
         addTaskUpdate,
+        addAttachment,
         currentUserName,
         loading,
         handleUpdateTaskStatus,
         handleUpdateTaskProgress,
+        handleUpdateTaskDescription,
     } = useAppContext();
 
     useEffect(() => {
@@ -98,12 +100,24 @@ export default function UserTaskDetailPage() {
     const [newUpdateText, setNewUpdateText] = useState('');
     const [isSubmittingSubtask, setIsSubmittingSubtask] = useState(false);
     const [isSubmittingUpdate, setIsSubmittingUpdate] = useState(false);
+    const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+    const [attachmentError, setAttachmentError] = useState('');
+    const [isEditingDescription, setIsEditingDescription] = useState(false);
+    const [descriptionDraft, setDescriptionDraft] = useState('');
+    const [isSavingDescription, setIsSavingDescription] = useState(false);
     const [pendingStatusChange, setPendingStatusChange] = useState<Task['status'] | null>(null);
     const [isSubmittingStatusChange, setIsSubmittingStatusChange] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const sortedTaskUpdates = useMemo(() => {
         const updates = taskId ? (taskUpdates[taskId] || []) : [];
         return [...updates].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [taskId, taskUpdates]);
+
+    useEffect(() => {
+        if (isEditingDescription) return;
+        const currentTask = tasks.find((item) => item.id === taskId);
+        setDescriptionDraft(currentTask?.description || '');
+    }, [isEditingDescription, taskId, tasks]);
 
     if (loading) return <LinearLoadingScreen message="กำลังโหลดรายละเอียดงาน..." />;
 
@@ -207,6 +221,47 @@ export default function UserTaskDetailPage() {
             setNewUpdateText('');
         } finally {
             setIsSubmittingUpdate(false);
+        }
+    };
+
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = event.target.files;
+        if (!files || files.length === 0 || isUploadingAttachment) return;
+
+        try {
+            setIsUploadingAttachment(true);
+            setAttachmentError('');
+            for (let index = 0; index < files.length; index += 1) {
+                await addAttachment(task.id, files[index]);
+            }
+        } catch (error) {
+            console.error('Failed to upload attachment:', error);
+            setAttachmentError('ไม่สามารถอัปโหลดไฟล์ได้ โปรดลองอีกครั้ง');
+        } finally {
+            setIsUploadingAttachment(false);
+            event.target.value = '';
+        }
+    };
+
+    const startEditDescription = () => {
+        setDescriptionDraft(task.description || '');
+        setIsEditingDescription(true);
+    };
+
+    const cancelEditDescription = () => {
+        if (isSavingDescription) return;
+        setDescriptionDraft(task.description || '');
+        setIsEditingDescription(false);
+    };
+
+    const saveDescription = async () => {
+        if (isSavingDescription) return;
+        try {
+            setIsSavingDescription(true);
+            await Promise.resolve(handleUpdateTaskDescription(task.id, descriptionDraft));
+            setIsEditingDescription(false);
+        } finally {
+            setIsSavingDescription(false);
         }
     };
 
@@ -324,14 +379,55 @@ export default function UserTaskDetailPage() {
                 </div>
 
                 <div className="bg-white border border-[#d0d4e4] rounded-xl p-3.5">
-                    <p className="text-[12px] font-semibold text-[#676879] uppercase tracking-wider mb-2">รายละเอียด</p>
-                    <p className="text-[13px] text-[#323338] whitespace-pre-wrap">
-                        {task.description || 'ไม่มีรายละเอียด'}
-                    </p>
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="text-[12px] font-semibold text-[#676879] uppercase tracking-wider">รายละเอียด</p>
+                        {!isEditingDescription && (
+                            <button
+                                type="button"
+                                onClick={startEditDescription}
+                                className="rounded-md border border-[#cfd9e6] bg-[#f1f5fa] px-2.5 py-1 text-[11px] font-semibold text-[#24425f] hover:bg-[#e6edf6]"
+                            >
+                                แก้ไข
+                            </button>
+                        )}
+                    </div>
+                    {isEditingDescription ? (
+                        <div className="space-y-2">
+                            <textarea
+                                value={descriptionDraft}
+                                onChange={(event) => setDescriptionDraft(event.target.value)}
+                                disabled={isSavingDescription}
+                                className="min-h-[120px] w-full resize-y rounded-lg border border-[#d0d4e4] px-2.5 py-2 text-[13px] text-[#323338] outline-none focus:border-[#0073ea] focus:ring-2 focus:ring-[#0073ea]/20 disabled:bg-[#f4f7fb]"
+                                placeholder="รายละเอียดงาน"
+                            />
+                            <div className="flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={cancelEditDescription}
+                                    disabled={isSavingDescription}
+                                    className="h-8 rounded-lg border border-[#d0d4e4] bg-white px-3 text-[12px] font-semibold text-[#323338] hover:bg-[#f5f6f8] disabled:opacity-60"
+                                >
+                                    ยกเลิก
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => void saveDescription()}
+                                    disabled={isSavingDescription}
+                                    className="h-8 rounded-lg bg-[#1f6feb] px-3 text-[12px] font-semibold text-white hover:bg-[#1a5fcb] disabled:opacity-60"
+                                >
+                                    {isSavingDescription ? 'กำลังบันทึก...' : 'บันทึก'}
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="text-[13px] text-[#323338] whitespace-pre-wrap">
+                            {task.description || 'ไม่มีรายละเอียด'}
+                        </p>
+                    )}
                 </div>
 
                 <div className="bg-white border border-[#d0d7e3] rounded-xl p-3.5 shadow-[0_2px_10px_rgba(16,39,61,0.06)]">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-2 gap-2">
                         <p className="text-[12px] font-semibold text-[#676879] uppercase tracking-wider flex items-center gap-1.5">
                             <CheckSquare className="w-3.5 h-3.5 text-[#1f6feb]" /> งานย่อย
                         </p>
@@ -389,7 +485,7 @@ export default function UserTaskDetailPage() {
                 </div>
 
                 <div className="bg-white border border-[#d0d7e3] rounded-xl p-3.5 shadow-[0_2px_10px_rgba(16,39,61,0.06)]">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-2 gap-2">
                         <p className="text-[12px] font-semibold text-[#676879] uppercase tracking-wider flex items-center gap-1.5">
                             <MessageSquare className="w-3.5 h-3.5 text-[#1f6feb]" /> อัปเดตและความคิดเห็น
                         </p>
@@ -437,8 +533,31 @@ export default function UserTaskDetailPage() {
                         <p className="text-[12px] font-semibold text-[#676879] uppercase tracking-wider flex items-center gap-1.5">
                             <Paperclip className="w-3.5 h-3.5 text-[#4a6786]" /> ไฟล์แนบ
                         </p>
-                        <p className="text-[11px] font-semibold text-[#323338]">{taskAttachments.length}</p>
+                        <div className="flex items-center gap-2">
+                            <p className="text-[11px] font-semibold text-[#323338]">{taskAttachments.length}</p>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                multiple
+                                onChange={handleFileUpload}
+                                className="hidden"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={isUploadingAttachment}
+                                className="inline-flex items-center gap-1 rounded-lg border border-[#cfd9e6] bg-[#f1f5fa] px-2.5 py-1.5 text-[11px] font-semibold text-[#24425f] transition-colors hover:bg-[#e6edf6] disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                <Plus className="w-3.5 h-3.5" />
+                                {isUploadingAttachment ? 'กำลังอัปโหลด...' : 'แนบไฟล์'}
+                            </button>
+                        </div>
                     </div>
+                    {attachmentError && (
+                        <p className="mb-2 rounded-lg border border-[#f2c5cf] bg-[#fff4f6] px-3 py-2 text-[12px] font-semibold text-[#b33c55]">
+                            {attachmentError}
+                        </p>
+                    )}
                     {taskAttachments.length === 0 ? (
                         <p className="text-[12px] text-[#a0a2b1]">ไม่มีไฟล์แนบ</p>
                     ) : (

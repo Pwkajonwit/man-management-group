@@ -40,7 +40,7 @@ import {
     isLegacyDefaultDepartmentId,
 } from '@/lib/scope';
 import { canAccessScopedRecord, canSelectScope, resolveUserScope } from '@/lib/rbac';
-import { isTaskAssignedToCurrentUser } from '@/utils/taskOwnerUtils';
+import { findCurrentTeamMember, isTaskAssignedToCurrentUser } from '@/utils/taskOwnerUtils';
 
 interface TaskUpdate {
     id: string;
@@ -82,6 +82,7 @@ interface AppContextType {
     // Task Updates (comments)
     taskUpdates: Record<string, TaskUpdate[]>;
     addTaskUpdate: (taskId: string, text: string) => Promise<void>;
+    createMyTask: (payload: { projectId: string; name: string; description?: string; planEndDate: string }) => Promise<void>;
     createWorkspace: (name: string, code?: string) => Promise<void>;
     updateWorkspace: (
         projectId: string,
@@ -964,6 +965,64 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
     }, [dataSource, resolveWriteScope, resolvedActiveProjectId, tasks]);
 
+    const createMyTask = useCallback(async (payload: { projectId: string; name: string; description?: string; planEndDate: string }) => {
+        const projectId = payload.projectId.trim();
+        const name = payload.name.trim();
+        const description = (payload.description || '').trim();
+        const planEndDate = payload.planEndDate.trim();
+        if (!projectId || !name || !planEndDate) return;
+
+        const project = selectedScopedProjects.find((item) => item.id === projectId);
+        if (!project) {
+            throw new Error('Selected project is not available');
+        }
+
+        const now = new Date();
+        const planStartDate = format(now, 'yyyy-MM-dd');
+        const startDate = new Date(`${planStartDate}T00:00:00`);
+        const endDate = new Date(`${planEndDate}T00:00:00`);
+        const diffDays = Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000);
+        const currentMember = findCurrentTeamMember(
+            teamMembers,
+            currentUserName,
+            user?.lineUserId,
+            user?.uid
+        );
+        const ownerName = currentMember?.name || currentUserName;
+        const nextOrder =
+            tasks
+                .filter((task) => task.projectId === projectId && (task.category || '') === 'งานของฉัน')
+                .reduce((maxOrder, task) => Math.max(maxOrder, task.order || 0), 0) + 1;
+        const scope = resolveWriteScope(projectId);
+        const newTaskData: Omit<Task, 'id'> = {
+            orgId: scope.orgId,
+            branchId: scope.branchId,
+            departmentId: scope.departmentId,
+            projectId,
+            name,
+            description,
+            category: 'งานของฉัน',
+            responsible: ownerName,
+            assignedEmployeeIds: currentMember ? [currentMember.id] : [],
+            progress: 0,
+            status: 'not-started',
+            planStartDate,
+            planEndDate,
+            planDuration: Math.max(1, Number.isFinite(diffDays) ? diffDays : 1),
+            estimatedHours: 8,
+            order: nextOrder,
+            createdAt: now.toISOString(),
+            updatedAt: now.toISOString(),
+        };
+
+        if (dataSource === 'firebase') {
+            await fbCreateTask(newTaskData);
+            return;
+        }
+
+        setTasks(prev => [...prev, { ...newTaskData, id: `my-${Date.now()}` }]);
+    }, [currentUserName, dataSource, resolveWriteScope, selectedScopedProjects, tasks, teamMembers, user?.lineUserId, user?.uid]);
+
     const handleDeleteItem = useCallback(async (taskId: string) => {
         if (dataSource === 'firebase') {
             await deleteTaskDoc(taskId);
@@ -1072,15 +1131,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
 
         const shouldForceCompletedProgress = newStatus === 'completed';
+        const nowIso = new Date().toISOString();
+        const completedDate = format(new Date(), 'yyyy-MM-dd');
         updateTaskInState(taskId, (task) => ({
             ...task,
             status: newStatus,
+            updatedAt: nowIso,
+            actualEndDate: newStatus === 'completed' ? (task.actualEndDate || completedDate) : undefined,
             ...(shouldForceCompletedProgress ? { progress: 100 } : {}),
         }));
 
         try {
             if (dataSource === 'firebase') {
-                const statusPatch: Partial<Task> = { status: newStatus };
+                const statusPatch: Partial<Task> = {
+                    status: newStatus,
+                    actualEndDate: newStatus === 'completed' ? (task?.actualEndDate || completedDate) : undefined,
+                };
                 if (shouldForceCompletedProgress) {
                     statusPatch.progress = 100;
                 }
@@ -1165,15 +1231,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
                     ? (p === 0 ? 'not-started' : 'in-progress')
                     : undefined;
 
+        const nowIso = new Date().toISOString();
+        const completedDate = format(new Date(), 'yyyy-MM-dd');
         updateTaskInState(taskId, (task) => ({
             ...task,
             progress: p,
+            updatedAt: nowIso,
             ...(nextStatus && nextStatus !== task.status ? { status: nextStatus } : {}),
+            ...(nextStatus === 'completed' ? { actualEndDate: task.actualEndDate || completedDate } : {}),
+            ...(nextStatus && nextStatus !== 'completed' ? { actualEndDate: undefined } : {}),
         }));
         if (dataSource === 'firebase') {
             const patch: Partial<Task> = { progress: p };
             if (task && nextStatus && nextStatus !== task.status) {
                 patch.status = nextStatus;
+                patch.actualEndDate = nextStatus === 'completed' ? (task.actualEndDate || completedDate) : undefined;
             }
             debouncedUpdate(`progress-${taskId}`, () => fbUpdateTask(taskId, patch));
         }
@@ -1265,6 +1337,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             updateNotificationSettings,
             activeProjectId: resolvedActiveProjectId, setActiveProjectId,
             taskUpdates, addTaskUpdate,
+            createMyTask,
             createWorkspace,
             updateWorkspace,
             deleteWorkspace,

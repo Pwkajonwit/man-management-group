@@ -12,6 +12,7 @@ export default function MePage() {
         teamMembers,
         currentUserName,
         loading,
+        createMyTask,
         handleUpdateTaskStatus,
         taskScopeBranchOptions,
         taskScopeDepartmentOptions,
@@ -27,6 +28,7 @@ export default function MePage() {
             currentUserName={currentUserName}
             branchOptions={taskScopeBranchOptions}
             departmentOptions={taskScopeDepartmentOptions}
+            onCreateMyTask={createMyTask}
             onStatusChange={handleUpdateTaskStatus}
         />
     );
